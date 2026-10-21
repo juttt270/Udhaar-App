@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -85,34 +85,34 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
   }, [fetchStats]);
 
   const todayFormatted = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
+    weekday: 'short',
     day: 'numeric',
-    month: 'long',
+    month: 'short',
     year: 'numeric',
   });
 
   return (
     <div className="page-container">
-      {/* Welcome Banner */}
+      {/* Top Banner */}
       <div
         style={{
           background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
           borderRadius: 'var(--radius-lg)',
-          padding: '24px 20px',
+          padding: '22px 20px',
           color: '#ffffff',
           marginBottom: 20,
-          boxShadow: '0 10px 20px rgba(2, 132, 199, 0.2)',
+          boxShadow: '0 8px 20px rgba(2, 132, 199, 0.2)',
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: 14,
         }}
       >
         <div>
           <span
             style={{
-              fontSize: '0.78rem',
+              fontSize: '0.75rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               background: 'rgba(255, 255, 255, 0.2)',
@@ -121,13 +121,13 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
               fontWeight: 700,
             }}
           >
-            {todayFormatted}
+            Today: {todayFormatted}
           </span>
-          <h1 style={{ fontSize: '1.6rem', marginTop: 8, color: '#ffffff' }}>
+          <h1 style={{ fontSize: '1.5rem', marginTop: 6, color: '#ffffff' }}>
             {plantName || 'Water Plant Dashboard'}
           </h1>
-          <p style={{ fontSize: '0.88rem', opacity: 0.9, marginTop: 4 }}>
-            Roznamcha, Udhaar Khata aur Monthly Bill Management
+          <p style={{ fontSize: '0.86rem', opacity: 0.9, marginTop: 2 }}>
+            Manage daily deliveries, customer accounts, and monthly bills easily.
           </p>
         </div>
 
@@ -142,10 +142,10 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <CalendarCheck2 size={16} /> Aaj Ka Roznamcha
+            <CalendarCheck2 size={16} /> Deliver Bottles Today
           </button>
           <button
-            onClick={() => onNavigate('customers')}
+            onClick={() => onNavigate('customers', { openAdd: true })}
             className="btn"
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
@@ -153,44 +153,44 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
               border: '1px solid rgba(255, 255, 255, 0.4)',
             }}
           >
-            <PlusCircle size={16} /> Naya Customer
+            <PlusCircle size={16} /> Add Customer
           </button>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
+      {/* 4 Primary KPI Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-header">
-            <span>Aaj Deliver Huwe</span>
+            <span>Delivered Today</span>
             <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
               <Droplets size={18} />
             </div>
           </div>
           <div className="stat-value">
-            {loading ? '...' : `${stats?.today?.bottlesDelivered || 0} Cans`}
+            {loading ? '...' : `${stats?.today?.bottlesDelivered || 0} Bottles`}
           </div>
           <div className="stat-hint">
-            Billed: Rs. {(stats?.today?.billedAmount || 0).toLocaleString()}
+            Bill: Rs. {(stats?.today?.billedAmount || 0).toLocaleString()}
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-header">
-            <span>Khali Cans Wapas</span>
+            <span>Empty Bottles Collected</span>
             <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
               <RotateCcw size={18} />
             </div>
           </div>
           <div className="stat-value">
-            {loading ? '...' : `${stats?.today?.bottlesReturned || 0} Cans`}
+            {loading ? '...' : `${stats?.today?.bottlesReturned || 0} Empty`}
           </div>
-          <div className="stat-hint">Aaj wapas mosool huwe</div>
+          <div className="stat-hint">Returned by customers today</div>
         </div>
 
         <div className="stat-card">
           <div className="stat-header">
-            <span>Aaj Ki Wasooli (Cash)</span>
+            <span>Cash Received Today</span>
             <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
               <Wallet size={18} />
             </div>
@@ -198,12 +198,12 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div className="stat-value" style={{ color: '#059669' }}>
             {loading ? '...' : `Rs. ${(stats?.today?.cashReceived || 0).toLocaleString()}`}
           </div>
-          <div className="stat-hint">Payment entry recorded</div>
+          <div className="stat-hint">Total payments collected</div>
         </div>
 
         <div className="stat-card">
           <div className="stat-header">
-            <span>Kul Baqi Udhaar</span>
+            <span>Total Unpaid Balance</span>
             <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
               <AlertTriangle size={18} />
             </div>
@@ -212,18 +212,18 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
             {loading ? '...' : `Rs. ${(stats?.totalPendingUdhaar || 0).toLocaleString()}`}
           </div>
           <div className="stat-hint">
-            {stats?.activeCustomersCount || 0} Active Customers
+            {stats?.activeCustomersCount || 0} active customers
           </div>
         </div>
       </div>
 
-      {/* Quick Action Cards Grid */}
+      {/* Quick Navigation Cards */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 14,
-          marginBottom: 24,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 12,
+          marginBottom: 22,
         }}
       >
         <div
@@ -234,8 +234,8 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--primary-light)',
                 color: 'var(--primary)',
@@ -244,15 +244,15 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
                 justifyContent: 'center',
               }}
             >
-              <CalendarCheck2 size={22} />
+              <CalendarCheck2 size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '0.98rem' }}>Daily Delivery Entry</h3>
+              <h3 style={{ fontSize: '0.96rem' }}>Daily Delivery</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Aaj k delivers & wapsi cans darj karein
+                Mark bottles delivered today
               </p>
             </div>
-            <ArrowRight size={16} color="var(--text-sub)" />
+            <ArrowRight size={15} color="var(--text-sub)" />
           </div>
         </div>
 
@@ -264,8 +264,8 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--success-light)',
                 color: 'var(--success)',
@@ -274,15 +274,15 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
                 justifyContent: 'center',
               }}
             >
-              <Wallet size={22} />
+              <Wallet size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '0.98rem' }}>Wasooli / Cash Entry</h3>
+              <h3 style={{ fontSize: '0.96rem' }}>Receive Cash</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Customer se aane wali raqam record karein
+                Record customer payments
               </p>
             </div>
-            <ArrowRight size={16} color="var(--text-sub)" />
+            <ArrowRight size={15} color="var(--text-sub)" />
           </div>
         </div>
 
@@ -294,8 +294,8 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 borderRadius: 'var(--radius-sm)',
                 background: '#f3e8ff',
                 color: '#8b5cf6',
@@ -304,15 +304,15 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
                 justifyContent: 'center',
               }}
             >
-              <FileText size={22} />
+              <FileText size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '0.98rem' }}>Monthly PDF Bill</h3>
+              <h3 style={{ fontSize: '0.96rem' }}>Monthly Bills</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Mahana hisab & printable PDF download
+                Download customer PDF bills
               </p>
             </div>
-            <ArrowRight size={16} color="var(--text-sub)" />
+            <ArrowRight size={15} color="var(--text-sub)" />
           </div>
         </div>
 
@@ -324,8 +324,8 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--warning-light)',
                 color: 'var(--warning)',
@@ -334,37 +334,37 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
                 justifyContent: 'center',
               }}
             >
-              <Users size={22} />
+              <Users size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '0.98rem' }}>Customer Directory</h3>
+              <h3 style={{ fontSize: '0.96rem' }}>Customers List</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Tamam ghaak aur unka balance
+                View all customer balances
               </p>
             </div>
-            <ArrowRight size={16} color="var(--text-sub)" />
+            <ArrowRight size={15} color="var(--text-sub)" />
           </div>
         </div>
       </div>
 
-      {/* Top Pending Receivables */}
+      {/* Customers With Highest Unpaid Balance */}
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <TrendingUp size={18} color="var(--danger)" />
-            <h3 style={{ fontSize: '1.05rem' }}>Top Pending Udhaar (Wajib-ul-Ada)</h3>
+            <h3 style={{ fontSize: '1rem' }}>Top Unpaid Customers (Pending Balances)</h3>
           </div>
           <button
             onClick={() => onNavigate('customers')}
             className="btn btn-secondary btn-sm"
           >
-            Tamam Customers Dekhein <ArrowRight size={14} />
+            View All Customers <ArrowRight size={14} />
           </button>
         </div>
 
         {topDebtors.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
-            Koi bara pending udhaar nahi hai. Sab hisab clear hai!
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+            All customer accounts are clear! No pending balances.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -380,29 +380,35 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
                   background: '#f8fafc',
                   border: '1px solid var(--border-color)',
                   flexWrap: 'wrap',
-                  gap: 8,
+                  gap: 10,
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{cust.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.94rem' }}>{cust.name}</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    {cust.area || 'Address not set'} • {cust.phone || 'No phone'} • Cans held:{' '}
+                    {cust.area || 'No area set'} • Phone: {cust.phone || 'N/A'} • Bottles held:{' '}
                     <strong>{cust.bottlesWithCustomer}</strong>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span
                     className="badge badge-danger"
                     style={{ fontSize: '0.85rem', padding: '4px 10px' }}
                   >
-                    Baqi: Rs. {cust.currentBalance.toLocaleString()}
+                    Unpaid: Rs. {cust.currentBalance.toLocaleString()}
                   </span>
                   <button
                     onClick={() => onNavigate('payments', { customerId: cust._id })}
                     className="btn btn-success btn-sm"
                   >
-                    Wasooli Darj Karein
+                    <Wallet size={14} /> Receive Cash
+                  </button>
+                  <button
+                    onClick={() => onNavigate('reports', { customerId: cust._id })}
+                    className="btn btn-outline-primary btn-sm"
+                  >
+                    <FileText size={14} /> Bill
                   </button>
                 </div>
               </div>

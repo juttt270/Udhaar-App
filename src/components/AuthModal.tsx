@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Droplet, Lock, Mail, User as UserIcon, Building2, Phone, MapPin, Sparkles, LogIn } from 'lucide-react';
+import { Droplet, Lock, Mail, User as UserIcon, Building2, Phone, MapPin, ArrowRight, LogIn } from 'lucide-react';
 import { useToast } from './Toast';
 
 interface AuthModalProps {
@@ -18,7 +18,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
     name: '',
     email: '',
     password: '',
-    plantName: 'Aqua Pure Water Plant',
+    plantName: 'Pure Drinking Water Plant',
     phone: '',
     address: '',
     defaultRate: 100,
@@ -47,13 +47,13 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
+        throw new Error(data.error || 'Login failed');
       }
 
-      toast.success(isRegistering ? 'Water plant account setup complete!' : 'Welcome back!');
+      toast.success(isRegistering ? 'Water plant created successfully!' : 'Welcome back!');
       onSuccess(data.user);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error';
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -62,8 +62,8 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
 
   return (
     <div className="modal-overlay" style={{ zIndex: 999 }}>
-      <div className="modal-content" style={{ maxWidth: 440 }}>
-        <div style={{ textAlign: 'center', padding: '24px 20px 10px' }}>
+      <div className="modal-content" style={{ maxWidth: 430 }}>
+        <div style={{ textAlign: 'center', padding: '24px 20px 8px' }}>
           <div
             style={{
               width: 56,
@@ -74,19 +74,19 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 16px rgba(2, 132, 199, 0.25)',
-              marginBottom: 12,
+              boxShadow: '0 6px 16px rgba(2, 132, 199, 0.25)',
+              marginBottom: 10,
             }}
           >
             <Droplet size={30} />
           </div>
           <h2 style={{ fontSize: '1.35rem', marginBottom: 4 }}>
-            {isRegistering ? 'Setup Your Water Plant' : 'Plant Owner Login'}
+            {isRegistering ? 'Setup Your Water Plant' : 'Welcome Back'}
           </h2>
           <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
             {isRegistering
-              ? 'Enter your water plant details to start managing monthly khata'
-              : 'Sign in to access your daily deliveries and customer ledger'}
+              ? 'Enter your plant details once to start tracking customer accounts'
+              : 'Sign in to access your daily deliveries and customer bills'}
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
           {isRegistering && (
             <>
               <div className="form-group">
-                <label className="form-label">Water Plant Name *</label>
+                <label className="form-label">Plant Name *</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -103,7 +103,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                     value={formData.plantName}
                     onChange={handleChange}
                     className="form-input"
-                    placeholder="e.g. Al-Rehman Pure Water Plant"
+                    placeholder="e.g. Al-Madina Water Plant"
                     style={{ paddingLeft: 36 }}
                   />
                   <Building2 size={16} style={{ position: 'absolute', left: 12, top: 13, color: '#94a3b8' }} />
@@ -111,7 +111,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Owner / Manager Name *</label>
+                <label className="form-label">Owner Name *</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -129,7 +129,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div className="form-group">
-                  <label className="form-label">Phone Number</label>
+                  <label className="form-label">Phone</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type="text"
@@ -145,7 +145,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Rate / Can (Rs.)</label>
+                  <label className="form-label">Bottle Price (Rs.)</label>
                   <input
                     type="number"
                     name="defaultRate"
@@ -158,7 +158,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Plant Address</label>
+                <label className="form-label">Address</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -166,7 +166,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                     value={formData.address}
                     onChange={handleChange}
                     className="form-input"
-                    placeholder="e.g. Main Market, Model Town"
+                    placeholder="e.g. Main Bazar, City"
                     style={{ paddingLeft: 34 }}
                   />
                   <MapPin size={15} style={{ position: 'absolute', left: 10, top: 13, color: '#94a3b8' }} />
@@ -185,7 +185,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                 value={formData.email}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="plant.owner@example.com"
+                placeholder="owner@example.com"
                 style={{ paddingLeft: 36 }}
               />
               <Mail size={16} style={{ position: 'absolute', left: 12, top: 13, color: '#94a3b8' }} />
@@ -203,34 +203,33 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                 value={formData.password}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="••••••••"
+                placeholder="At least 6 characters"
                 style={{ paddingLeft: 36 }}
               />
               <Lock size={16} style={{ position: 'absolute', left: 12, top: 13, color: '#94a3b8' }} />
             </div>
-            <span className="form-hint">Minimum 6 characters</span>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="btn btn-primary"
+            className="btn btn-primary btn-lg"
             style={{ width: '100%', marginTop: 12 }}
           >
             {loading ? (
-              'Processing...'
+              'Please wait...'
             ) : isRegistering ? (
               <>
-                <Sparkles size={16} /> Complete Plant Setup
+                Create Plant Account <ArrowRight size={17} />
               </>
             ) : (
               <>
-                <LogIn size={16} /> Login to Dashboard
+                <LogIn size={17} /> Sign In
               </>
             )}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
             <button
               type="button"
               onClick={() => setIsRegistering(!isRegistering)}
@@ -244,8 +243,8 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
               }}
             >
               {isRegistering
-                ? 'Already have an account? Log In'
-                : 'Need to register a new plant? Click here'}
+                ? 'Already have an account? Sign In'
+                : 'Need to create a new water plant? Click here'}
             </button>
           </div>
         </form>

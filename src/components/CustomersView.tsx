@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -12,7 +12,9 @@ import {
   Trash2,
   X,
   MessageCircle,
-  Building,
+  PlusCircle,
+  Droplets,
+  CheckCircle2,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -36,16 +38,36 @@ export interface CustomerData {
 interface CustomersViewProps {
   onNavigate: (tab: string, extra?: unknown) => void;
   defaultPlantRate: number;
+  initialOpenAdd?: boolean;
 }
 
-export default function CustomersView({ onNavigate, defaultPlantRate }: CustomersViewProps) {
+export default function CustomersView({ onNavigate, defaultPlantRate, initialOpenAdd }: CustomersViewProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'debtors' | 'active'>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(initialOpenAdd || false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerData | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Quick action modals directly from customer card
+  const [quickDeliveryCust, setQuickDeliveryCust] = useState<CustomerData | null>(null);
+  const [deliveryData, setDeliveryData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    bottlesDelivered: 1,
+    bottlesReturned: 1,
+  });
+  const [savingDelivery, setSavingDelivery] = useState(false);
+
+  const [quickPaymentCust, setQuickPaymentCust] = useState<CustomerData | null>(null);
+  const [paymentData, setPaymentData] = useState({
+    amount: '',
+    paymentMethod: 'Cash',
+    date: new Date().toISOString().split('T')[0],
+    receiptNo: `REC-${Date.now().toString().slice(-5)}`,
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+
   const toast = useToast();
 
   const [formData, setFormData] = useState({
@@ -113,7 +135,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      toast.warning('Please enter customer name');
+      toast.warning('Customer name is required');
       return;
     }
 
@@ -132,12 +154,82 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Operation failed');
 
-      toast.success(isEdit ? 'Customer details updated!' : 'New customer added successfully!');
+      toast.success(isEdit ? 'Customer updated!' : 'New customer added successfully!');
       setShowAddModal(false);
       fetchCustomers();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       toast.error(msg);
+    }
+  };
+
+  // Quick 1-click delivery logger from customer card
+  const handleSaveQuickDelivery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickDeliveryCust) return;
+
+    setSavingDelivery(true);
+    try {
+      const res = await fetch('/api/deliveries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: deliveryData.date,
+          entries: [
+            {
+              customerId: quickDeliveryCust._id,
+              bottlesDelivered: Number(deliveryData.bottlesDelivered) || 0,
+              bottlesReturned: Number(deliveryData.bottlesReturned) || 0,
+              rate: quickDeliveryCust.ratePerBottle || 100,
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save delivery');
+
+      toast.success(`Delivery of ${deliveryData.bottlesDelivered} bottles saved for ${quickDeliveryCust.name}!`);
+      setQuickDeliveryCust(null);
+      fetchCustomers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      toast.error(msg);
+    } finally {
+      setSavingDelivery(false);
+    }
+  };
+
+  // Quick 1-click payment logger from customer card
+  const handleSaveQuickPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickPaymentCust || !paymentData.amount) return;
+
+    setSavingPayment(true);
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: quickPaymentCust._id,
+          amount: Number(paymentData.amount),
+          paymentMethod: paymentData.paymentMethod,
+          date: paymentData.date,
+          receiptNo: paymentData.receiptNo,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to record payment');
+
+      toast.success(`Payment of Rs. ${paymentData.amount} received from ${quickPaymentCust.name}!`);
+      setQuickPaymentCust(null);
+      fetchCustomers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      toast.error(msg);
+    } finally {
+      setSavingPayment(false);
     }
   };
 
@@ -193,15 +285,15 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
       >
         <div>
           <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Users size={24} color="var(--primary)" /> Customer Directory ({customers.length})
+            <Users size={24} color="var(--primary)" /> Customers ({customers.length})
           </h2>
           <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Tamam monthly water delivery customers aur unka hisab kitab
+            List of regular delivery customers and their balance status
           </p>
         </div>
 
         <button onClick={handleOpenAdd} className="btn btn-primary">
-          <UserPlus size={16} /> Naya Customer Add Karein
+          <UserPlus size={16} /> Add New Customer
         </button>
       </div>
 
@@ -223,7 +315,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, area..."
+            placeholder="Search by customer name, phone, area..."
             className="form-input"
             style={{ paddingLeft: 36, minHeight: 38 }}
           />
@@ -238,13 +330,13 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
             onClick={() => setStatusFilter('all')}
             className={`btn btn-sm ${statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            Sab ({customers.length})
+            All ({customers.length})
           </button>
           <button
             onClick={() => setStatusFilter('debtors')}
             className={`btn btn-sm ${statusFilter === 'debtors' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            Baqi Udhaar Walay ({customers.filter((c) => c.currentBalance > 0).length})
+            Unpaid Balances ({customers.filter((c) => c.currentBalance > 0).length})
           </button>
         </div>
       </div>
@@ -252,19 +344,19 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
       {/* Customer Cards Grid */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--text-muted)' }}>
-          Loading customer directory...
+          Loading customer records...
         </div>
       ) : filteredCustomers.length === 0 ? (
         <div className="card empty-state">
           <div className="empty-icon">
             <Users size={32} />
           </div>
-          <h3>Koi customer nahi mila</h3>
+          <h3>No customers found</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            Naya customer shamil karne k liye &quot;Naya Customer Add Karein&quot; par click karein.
+            Click &quot;Add New Customer&quot; above to create your first customer.
           </p>
           <button onClick={handleOpenAdd} className="btn btn-primary" style={{ marginTop: 8 }}>
-            <UserPlus size={16} /> Add First Customer
+            <UserPlus size={16} /> Add New Customer
           </button>
         </div>
       ) : (
@@ -341,7 +433,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                   >
                     <div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        Net Udhaar Baqi
+                        Unpaid Balance
                       </div>
                       <div
                         style={{
@@ -352,14 +444,14 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                       >
                         Rs. {Math.abs(cust.currentBalance).toLocaleString()}{' '}
                         <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-                          {hasDebt ? '(Wajib)' : isAdvance ? '(Advance)' : '(Clear)'}
+                          {hasDebt ? '(Due)' : isAdvance ? '(Advance)' : '(Clear)'}
                         </span>
                       </div>
                     </div>
 
                     <div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        Cans Held (Wapas lene hain)
+                        Empty Bottles with Customer
                       </div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>
                         {cust.bottlesWithCustomer} <span style={{ fontSize: '0.75rem' }}>Cans</span>
@@ -376,7 +468,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                       marginBottom: 12,
                     }}
                   >
-                    <span>Rate: <strong>Rs. {cust.ratePerBottle}</strong> / can</span>
+                    <span>Rate: <strong>Rs. {cust.ratePerBottle}</strong> / bottle</span>
                     {cust.phone && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Phone size={12} /> {cust.phone}
@@ -385,22 +477,48 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                   </div>
                 </div>
 
-                {/* Card Action Buttons */}
+                {/* Direct Action Buttons on Customer Card (Minimum Clicks!) */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
                   <button
-                    onClick={() => onNavigate('payments', { customerId: cust._id })}
+                    onClick={() => {
+                      setQuickDeliveryCust(cust);
+                      setDeliveryData({
+                        date: new Date().toISOString().split('T')[0],
+                        bottlesDelivered: 1,
+                        bottlesReturned: 1,
+                      });
+                    }}
+                    className="btn btn-outline-primary btn-sm"
+                    style={{ flex: 1 }}
+                    title="Log today's delivery for this customer"
+                  >
+                    <Droplets size={14} /> + Delivery
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setQuickPaymentCust(cust);
+                      setPaymentData({
+                        amount: cust.currentBalance > 0 ? String(cust.currentBalance) : '',
+                        paymentMethod: 'Cash',
+                        date: new Date().toISOString().split('T')[0],
+                        receiptNo: `REC-${Date.now().toString().slice(-5)}`,
+                      });
+                    }}
                     className="btn btn-success btn-sm"
                     style={{ flex: 1 }}
+                    title="Record cash received from this customer"
                   >
-                    <Wallet size={14} /> Wasooli
+                    <Wallet size={14} /> + Cash
                   </button>
 
                   <button
                     onClick={() => onNavigate('reports', { customerId: cust._id })}
-                    className="btn btn-outline-primary btn-sm"
+                    className="btn btn-secondary btn-sm"
                     style={{ flex: 1 }}
+                    title="View & Download PDF Bill"
                   >
-                    <FileText size={14} /> Month Bill (PDF)
+                    <FileText size={14} /> Bill
                   </button>
 
                   {cust.phone && (
@@ -422,13 +540,156 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
         </div>
       )}
 
+      {/* Quick Delivery Modal (Log delivery right from customer card!) */}
+      {quickDeliveryCust && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 380 }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Droplets size={18} color="var(--primary)" /> Log Delivery: {quickDeliveryCust.name}
+              </h3>
+              <button onClick={() => setQuickDeliveryCust(null)} className="toast-close">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveQuickDelivery}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Delivery Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={deliveryData.date}
+                    onChange={(e) => setDeliveryData({ ...deliveryData, date: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Bottles Delivered</label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      value={deliveryData.bottlesDelivered}
+                      onChange={(e) => setDeliveryData({ ...deliveryData, bottlesDelivered: Number(e.target.value) || 0 })}
+                      className="form-input"
+                      style={{ fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Empty Returned</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={deliveryData.bottlesReturned}
+                      onChange={(e) => setDeliveryData({ ...deliveryData, bottlesReturned: Number(e.target.value) || 0 })}
+                      className="form-input"
+                      style={{ fontWeight: 700 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, fontSize: '0.84rem' }}>
+                  Cost: <strong>Rs. {(deliveryData.bottlesDelivered * (quickDeliveryCust.ratePerBottle || 100)).toLocaleString()}</strong> (Rate: Rs. {quickDeliveryCust.ratePerBottle}/can)
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setQuickDeliveryCust(null)} className="btn btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingDelivery} className="btn btn-primary">
+                  {savingDelivery ? 'Saving...' : 'Save Delivery'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Payment Modal (Receive cash right from customer card!) */}
+      {quickPaymentCust && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 380 }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wallet size={18} color="var(--success)" /> Receive Cash: {quickPaymentCust.name}
+              </h3>
+              <button onClick={() => setQuickPaymentCust(null)} className="toast-close">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveQuickPayment}>
+              <div className="modal-body">
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: 10, borderRadius: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#b91c1c' }}>Total Unpaid Balance Due:</span>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c' }}>
+                    Rs. {quickPaymentCust.currentBalance.toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Amount Received (Rs.) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={paymentData.amount}
+                    onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                    className="form-input"
+                    placeholder="Enter amount"
+                    style={{ fontWeight: 800, fontSize: '1.1rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Payment Method</label>
+                    <select
+                      value={paymentData.paymentMethod}
+                      onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value })}
+                      className="form-select"
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="EasyPaisa">EasyPaisa</option>
+                      <option value="JazzCash">JazzCash</option>
+                      <option value="Bank">Bank Transfer</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Date</label>
+                    <input
+                      type="date"
+                      value={paymentData.date}
+                      onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setQuickPaymentCust(null)} className="btn btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingPayment} className="btn btn-success">
+                  {savingPayment ? 'Saving...' : 'Confirm Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Customer Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.15rem' }}>
-                {editingCustomer ? 'Customer Details Edit Karein' : 'Naya Customer Shamil Karein'}
+                {editingCustomer ? 'Edit Customer Details' : 'Add New Customer'}
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -466,31 +727,31 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Area / Sector / Street</label>
+                    <label className="form-label">Area / Street</label>
                     <input
                       type="text"
                       value={formData.area}
                       onChange={(e) => setFormData({ ...formData, area: e.target.value })}
                       className="form-input"
-                      placeholder="e.g. Block C, St 5"
+                      placeholder="e.g. Sector G, Street 4"
                     />
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Full Address</label>
+                  <label className="form-label">Full Address (Optional)</label>
                   <input
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="form-input"
-                    placeholder="House #, Street details"
+                    placeholder="House number, landmark, etc."
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div className="form-group">
-                    <label className="form-label">Rate / Can (Rs.)</label>
+                    <label className="form-label">Bottle Price (Rs.)</label>
                     <input
                       type="number"
                       required
@@ -503,7 +764,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Initial Udhaar (Rs.)</label>
+                    <label className="form-label">Previous Balance</label>
                     <input
                       type="number"
                       value={formData.initialBalance}
@@ -512,11 +773,11 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                       }
                       className="form-input"
                     />
-                    <span className="form-hint">Pichla baqi hisab</span>
+                    <span className="form-hint">Old pending debt (if any)</span>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Deposit Cans</label>
+                    <label className="form-label">Deposit Bottles</label>
                     <input
                       type="number"
                       value={formData.depositBottles}
@@ -525,18 +786,18 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                       }
                       className="form-input"
                     />
-                    <span className="form-hint">Khali bottles di huwi</span>
+                    <span className="form-hint">Bottles held</span>
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Special Notes (Optional)</label>
+                  <label className="form-label">Notes (Optional)</label>
                   <input
                     type="text"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     className="form-input"
-                    placeholder="e.g. Delivery in morning only"
+                    placeholder="e.g. Leave bottles at gate"
                   />
                 </div>
               </div>
@@ -568,15 +829,15 @@ export default function CustomersView({ onNavigate, defaultPlantRate }: Customer
                 <X size={18} />
               </button>
             </div>
-            <div className="modal-body" style={{ fontSize: '0.9rem' }}>
-              Kya aap waqai is customer ko delete karna chahte hain? Is customer k tamam delivery records aur payments bhi delete ho jayen ge.
+            <div className="modal-body" style={{ fontSize: '0.88rem' }}>
+              Are you sure you want to delete this customer? All their delivery history and payment records will also be removed.
             </div>
             <div className="modal-footer">
               <button onClick={() => setDeleteConfirmId(null)} className="btn btn-secondary">
-                Nahi, Cancel
+                Cancel
               </button>
               <button onClick={() => handleDelete(deleteConfirmId)} className="btn btn-danger">
-                Haan, Delete Karein
+                Delete Customer
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   Building2,
   Menu,
   X,
+  PlusCircle,
 } from 'lucide-react';
 import AuthModal from '@/components/AuthModal';
 import DashboardView from '@/components/DashboardView';
@@ -38,6 +39,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'daily' | 'customers' | 'payments' | 'reports' | 'settings'>('dashboard');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
+  const [openAddCustomer, setOpenAddCustomer] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const toast = useToast();
@@ -76,7 +78,7 @@ export default function HomePage() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setCurrentUser(null);
-      toast.info('Logged out.');
+      toast.info('Signed out successfully.');
     } catch {
       toast.error('Logout error');
     }
@@ -90,6 +92,14 @@ export default function HomePage() {
     } else {
       setSelectedCustomerId(undefined);
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (extra && (extra as any).openAdd) {
+      setOpenAddCustomer(true);
+    } else {
+      setOpenAddCustomer(false);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setActiveTab(tab as any);
     setMobileMenuOpen(false);
@@ -119,13 +129,12 @@ export default function HomePage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            animation: 'pulse 1.5s infinite',
           }}
         >
           <Droplet size={28} />
         </div>
         <div style={{ fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Starting Water Plant System...
+          Loading Water Plant System...
         </div>
       </div>
     );
@@ -145,16 +154,16 @@ export default function HomePage() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'daily', label: 'Roznamcha', icon: CalendarCheck2 },
+    { id: 'daily', label: 'Daily Delivery', icon: CalendarCheck2 },
     { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'payments', label: 'Wasooli', icon: Wallet },
-    { id: 'reports', label: 'Monthly Bill', icon: FileText },
+    { id: 'payments', label: 'Payments', icon: Wallet },
+    { id: 'reports', label: 'Bills & PDF', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
     <div className="app-layout">
-      {/* Desktop Sidebar */}
+      {/* Sidebar Navigation for Desktop */}
       <aside
         className="sidebar"
         style={{
@@ -206,7 +215,7 @@ export default function HomePage() {
                 {currentUser.plantName || 'Water Plant'}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700 }}>
-                KHATA MANAGER
+                UDHAAR & BILLING
               </div>
             </div>
           </div>
@@ -255,7 +264,7 @@ export default function HomePage() {
           })}
         </nav>
 
-        {/* Bottom User Profile */}
+        {/* User Info & Sign Out */}
         <div
           style={{
             padding: '14px 16px',
@@ -278,29 +287,29 @@ export default function HomePage() {
             >
               {currentUser.name}
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Owner / Admin</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Plant Manager</div>
           </div>
           <button
             onClick={handleLogout}
             className="toast-close"
             style={{ color: 'var(--danger)' }}
-            title="Logout"
+            title="Sign Out"
           >
             <LogOut size={16} />
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="main-content">
-        {/* Top Header Bar for Mobile & Desktop */}
+        {/* Top Bar Header */}
         <header className="top-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="btn btn-secondary btn-sm"
-              style={{ display: 'inline-flex' }}
-              aria-label="Toggle navigation menu"
+              style={{ display: isMobile ? 'inline-flex' : 'none' }}
+              aria-label="Toggle menu"
             >
               <Menu size={18} />
             </button>
@@ -313,18 +322,18 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               onClick={() => navigateTo('daily')}
               className="btn btn-primary btn-sm"
               style={{ display: 'inline-flex' }}
             >
-              <CalendarCheck2 size={15} /> Roznamcha Entry
+              <CalendarCheck2 size={15} /> Deliver Bottles
             </button>
           </div>
         </header>
 
-        {/* Dynamic Tab Views */}
+        {/* Views */}
         {activeTab === 'dashboard' && (
           <DashboardView
             plantName={currentUser.plantName}
@@ -338,6 +347,7 @@ export default function HomePage() {
           <CustomersView
             onNavigate={navigateTo}
             defaultPlantRate={currentUser.defaultRate}
+            initialOpenAdd={openAddCustomer}
           />
         )}
 
@@ -359,7 +369,7 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Always visible on mobile screens) */}
+      {/* Bottom Navigation for Mobile */}
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
         {navItems.slice(0, 5).map((item) => {
           const Icon = item.icon;

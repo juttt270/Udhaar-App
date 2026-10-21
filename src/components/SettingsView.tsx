@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Settings, Building2, Phone, MapPin, DollarSign, Lock, Save, LogOut } from 'lucide-react';
@@ -77,7 +77,7 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
           <Settings size={24} color="var(--primary)" /> Water Plant Settings
         </h2>
         <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-          Plant ka naam, phone, default rate aur password tabdeel karein
+          Update plant name, phone number, default rate, and login credentials
         </p>
       </div>
 
@@ -101,7 +101,7 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
                 />
                 <Building2 size={16} style={{ position: 'absolute', left: 12, top: 13, color: '#94a3b8' }} />
               </div>
-              <span className="form-hint">Yeh naam PDF bills aur receipts par print hoga</span>
+              <span className="form-hint">This name is printed on PDF bills and receipts</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -121,7 +121,7 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
               </div>
 
               <div className="form-group">
-                <label className="form-label">Default Rate / Can (Rs.)</label>
+                <label className="form-label">Default Bottle Price (Rs.)</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="number"
@@ -154,17 +154,17 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
               <h4 style={{ fontSize: '0.98rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Lock size={16} color="var(--primary)" /> Change Login Password
+                <Lock size={16} color="var(--primary)" /> Change Password
               </h4>
               <div className="form-group">
-                <label className="form-label">New Password (Khali chorein agar tabdeel nahi karna)</label>
+                <label className="form-label">New Password (Leave empty to keep current password)</label>
                 <input
                   type="password"
                   minLength={6}
                   value={formData.newPassword}
                   onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                   className="form-input"
-                  placeholder="Leave empty to keep current password"
+                  placeholder="Enter at least 6 characters"
                 />
               </div>
             </div>
@@ -185,7 +185,7 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
                 className="btn btn-secondary"
                 style={{ color: 'var(--danger)' }}
               >
-                <LogOut size={16} /> Logout Account
+                <LogOut size={16} /> Sign Out
               </button>
 
               <button
@@ -193,7 +193,7 @@ export default function SettingsView({ onLogout, onUpdatePlantName }: SettingsVi
                 disabled={saving}
                 className="btn btn-primary btn-lg"
               >
-                <Save size={18} /> {saving ? 'Saving...' : 'Settings Save Karein'}
+                <Save size={18} /> {saving ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
           </form>

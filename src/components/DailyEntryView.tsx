@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -9,8 +9,7 @@ import {
   Save,
   CheckCircle2,
   Droplets,
-  RotateCcw,
-  Sparkles,
+  Wand2,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -54,7 +53,6 @@ export default function DailyEntryView() {
       const custList: CustomerItem[] = custData.customers || [];
       setCustomers(custList);
 
-      // Map existing deliveries for this date
       const deliveryMap: Record<string, DeliveryRecord> = {};
       (delData.deliveries || []).forEach(
         (d: {
@@ -74,7 +72,7 @@ export default function DailyEntryView() {
         }
       );
 
-      // For customers without an entry on this date, initialize with 0
+      // Initialize customers without entries as 0
       custList.forEach((c) => {
         if (!deliveryMap[c._id]) {
           deliveryMap[c._id] = {
@@ -142,6 +140,22 @@ export default function DailyEntryView() {
     });
   };
 
+  // Magic button: 1-click set 1 bottle delivered & 1 empty returned for every customer!
+  const handleFillAllOneBottle = () => {
+    setEntries((prev) => {
+      const updated = { ...prev };
+      customers.forEach((c) => {
+        updated[c._id] = {
+          ...(updated[c._id] || { customerId: c._id, rate: c.ratePerBottle || 100 }),
+          bottlesDelivered: 1,
+          bottlesReturned: 1,
+        };
+      });
+      return updated;
+    });
+    toast.info('Set 1 Bottle Delivered & 1 Empty Returned for all customers! Click Save to confirm.');
+  };
+
   const filteredCustomers = useMemo(() => {
     if (!search.trim()) return customers;
     const q = search.toLowerCase();
@@ -153,7 +167,6 @@ export default function DailyEntryView() {
     );
   }, [customers, search]);
 
-  // Totals calculations
   const totalDelivered = useMemo(() => {
     return Object.values(entries).reduce((sum, e) => sum + (e.bottlesDelivered || 0), 0);
   }, [entries]);
@@ -184,7 +197,7 @@ export default function DailyEntryView() {
         throw new Error(data.error || 'Failed to save entries');
       }
 
-      toast.success(`Roznamcha Saved! Total ${totalDelivered} bottles (Rs. ${totalAmountBilled}) recorded.`);
+      toast.success(`Saved! ${totalDelivered} bottles (Rs. ${totalAmountBilled.toLocaleString()}) recorded for ${selectedDate}.`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error saving entries';
       toast.error(msg);
@@ -195,7 +208,7 @@ export default function DailyEntryView() {
 
   return (
     <div className="page-container">
-      {/* Top Header & Date Navigation */}
+      {/* Top Controls Bar */}
       <div
         className="card"
         style={{
@@ -208,13 +221,14 @@ export default function DailyEntryView() {
           gap: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Date Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <button
             onClick={() => handleDateShift(-1)}
             className="btn btn-secondary btn-sm"
-            title="Pichla Din"
+            title="Previous Day"
           >
-            <ChevronLeft size={16} /> Pichla Din
+            <ChevronLeft size={16} /> Prev Day
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -231,32 +245,43 @@ export default function DailyEntryView() {
           <button
             onClick={() => handleDateShift(1)}
             className="btn btn-secondary btn-sm"
-            title="Agla Din"
+            title="Next Day"
           >
-            Agla Din <ChevronRight size={16} />
+            Next Day <ChevronRight size={16} />
           </button>
 
           <button
             onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
             className="btn btn-outline-primary btn-sm"
           >
-            Aaj (Today)
+            Today
           </button>
         </div>
 
-        {/* Live Counters */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Live Counters & Save */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Quick automation button */}
+          <button
+            type="button"
+            onClick={handleFillAllOneBottle}
+            className="btn btn-secondary btn-sm"
+            style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
+            title="Set 1 bottle for all customers automatically"
+          >
+            <Wand2 size={14} /> 1-Click: 1 Bottle to All
+          </button>
+
           <div
             style={{
               background: '#e0f2fe',
               color: '#0369a1',
               padding: '6px 12px',
               borderRadius: 'var(--radius-sm)',
-              fontSize: '0.85rem',
+              fontSize: '0.84rem',
               fontWeight: 700,
             }}
           >
-            Delivered: {totalDelivered} Cans
+            Delivered: {totalDelivered}
           </div>
 
           <div
@@ -265,11 +290,11 @@ export default function DailyEntryView() {
               color: '#92400e',
               padding: '6px 12px',
               borderRadius: 'var(--radius-sm)',
-              fontSize: '0.85rem',
+              fontSize: '0.84rem',
               fontWeight: 700,
             }}
           >
-            Returned: {totalReturned} Empty
+            Returned: {totalReturned}
           </div>
 
           <div
@@ -278,11 +303,11 @@ export default function DailyEntryView() {
               color: '#065f46',
               padding: '6px 12px',
               borderRadius: 'var(--radius-sm)',
-              fontSize: '0.85rem',
+              fontSize: '0.84rem',
               fontWeight: 700,
             }}
           >
-            Billed: Rs. {totalAmountBilled.toLocaleString()}
+            Total: Rs. {totalAmountBilled.toLocaleString()}
           </div>
 
           <button
@@ -295,7 +320,7 @@ export default function DailyEntryView() {
               'Saving...'
             ) : (
               <>
-                <Save size={16} /> Roznamcha Save Karein
+                <Save size={16} /> Save Deliveries
               </>
             )}
           </button>
@@ -308,7 +333,7 @@ export default function DailyEntryView() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Customer ka naam, phone number ya area search karein..."
+          placeholder="Search customer by name, area, or phone number..."
           className="form-input"
           style={{ paddingLeft: 38, background: '#ffffff' }}
         />
@@ -318,19 +343,19 @@ export default function DailyEntryView() {
         />
       </div>
 
-      {/* Customer Entry List */}
+      {/* Customer Entry Rows */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--text-muted)' }}>
-          Loading daily delivery grid...
+          Loading delivery list...
         </div>
       ) : filteredCustomers.length === 0 ? (
         <div className="card empty-state">
           <div className="empty-icon">
             <Droplets size={32} />
           </div>
-          <h3>Koi active customer nahi mila</h3>
+          <h3>No active customers found</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            Roznamcha shuru karne k liye pehle customer add karein.
+            Add customers first to start recording daily water deliveries.
           </p>
         </div>
       ) : (
@@ -363,7 +388,7 @@ export default function DailyEntryView() {
                   background: delivered > 0 ? '#f0f9ff' : '#ffffff',
                 }}
               >
-                {/* Customer Info */}
+                {/* Customer Details */}
                 <div style={{ minWidth: 200, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontWeight: 700, fontSize: '0.98rem' }}>{cust.name}</span>
@@ -379,13 +404,13 @@ export default function DailyEntryView() {
                   </div>
                 </div>
 
-                {/* Quick Presets */}
+                {/* 1-Tap Quick Fill Options */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => handleQuickPreset(cust._id, 1, 1)}
                     className="btn btn-secondary btn-sm"
-                    title="1 Delivery, 1 Empty Wapas"
+                    title="1 Delivered, 1 Empty Returned"
                   >
                     1 In / 1 Out
                   </button>
@@ -393,7 +418,7 @@ export default function DailyEntryView() {
                     type="button"
                     onClick={() => handleQuickPreset(cust._id, 2, 2)}
                     className="btn btn-secondary btn-sm"
-                    title="2 Delivery, 2 Empty Wapas"
+                    title="2 Delivered, 2 Empty Returned"
                   >
                     2 In / 2 Out
                   </button>
@@ -402,13 +427,13 @@ export default function DailyEntryView() {
                     onClick={() => handleQuickPreset(cust._id, 0, 0)}
                     className="btn btn-secondary btn-sm"
                     style={{ color: '#ef4444' }}
-                    title="Clear/Nahi Liya"
+                    title="No Delivery Today"
                   >
-                    Clear (0)
+                    0 (Skip)
                   </button>
                 </div>
 
-                {/* Steppers: Delivered and Returned */}
+                {/* Stepper Inputs */}
                 <div
                   style={{
                     display: 'flex',
@@ -417,7 +442,7 @@ export default function DailyEntryView() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  {/* Delivered Cans */}
+                  {/* Bottles Delivered */}
                   <div>
                     <label
                       style={{
@@ -428,7 +453,7 @@ export default function DailyEntryView() {
                         marginBottom: 3,
                       }}
                     >
-                      DELIVERED (CANS)
+                      BOTTLES DELIVERED
                     </label>
                     <div className="bottle-stepper">
                       <button
@@ -458,7 +483,7 @@ export default function DailyEntryView() {
                     </div>
                   </div>
 
-                  {/* Returned Empty Cans */}
+                  {/* Empty Bottles Returned */}
                   <div>
                     <label
                       style={{
@@ -499,8 +524,8 @@ export default function DailyEntryView() {
                     </div>
                   </div>
 
-                  {/* Daily Total Cost */}
-                  <div style={{ textAlign: 'right', minWidth: 80 }}>
+                  {/* Line Total */}
+                  <div style={{ textAlign: 'right', minWidth: 75 }}>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Amount</div>
                     <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
                       Rs. {dailyAmount}
@@ -513,7 +538,7 @@ export default function DailyEntryView() {
         </div>
       )}
 
-      {/* Floating Save button for mobile screens */}
+      {/* Sticky Bottom Save Button for Mobile */}
       <div
         style={{
           position: 'sticky',
@@ -534,7 +559,7 @@ export default function DailyEntryView() {
             padding: '12px 28px',
           }}
         >
-          {saving ? 'Saving Entries...' : <><Save size={18} /> Roznamcha Save Karein (Rs. {totalAmountBilled})</>}
+          {saving ? 'Saving...' : <><Save size={18} /> Save Deliveries (Rs. {totalAmountBilled.toLocaleString()})</>}
         </button>
       </div>
     </div>

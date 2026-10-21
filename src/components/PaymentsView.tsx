@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -7,8 +7,6 @@ import {
   Receipt,
   Trash2,
   CheckCircle2,
-  Calendar,
-  Building,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -94,7 +92,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       return;
     }
     if (!formData.amount || Number(formData.amount) <= 0) {
-      toast.warning('Please enter a valid payment amount');
+      toast.warning('Please enter a valid amount');
       return;
     }
 
@@ -114,7 +112,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
       toast.success(data.message || 'Payment recorded successfully!');
 
-      // Reset form amount & generate new receipt number
       setFormData((prev) => ({
         ...prev,
         amount: '',
@@ -132,14 +129,14 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Kya aap is payment record ko delete karna chahte hain?')) return;
+    if (!confirm('Are you sure you want to delete this payment record?')) return;
 
     try {
       const res = await fetch(`/api/payments?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete');
 
-      toast.success('Payment entry deleted.');
+      toast.success('Payment record deleted.');
       loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
@@ -151,19 +148,19 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
     <div className="page-container">
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Wallet size={24} color="var(--success)" /> Wasooli / Cash Entry
+          <Wallet size={24} color="var(--success)" /> Payments / Cash Received
         </h2>
         <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-          Customer se mosool hone wali adaigi (cash, online transfer) record karein
+          Record customer payments received in cash or online transfer
         </p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
-        {/* Record Payment Form Card */}
+        {/* Record Payment Form */}
         <div className="card" style={{ borderLeft: '4px solid var(--success)' }}>
           <div className="card-header">
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <PlusCircle size={18} color="var(--success)" /> Nayi Wasooli Record Karein
+              <PlusCircle size={18} color="var(--success)" /> Record New Payment
             </h3>
           </div>
 
@@ -178,7 +175,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
               {/* Customer Selector */}
               <div className="form-group">
                 <label className="form-label">
-                  <span>Customer Muntakhib Karein *</span>
+                  <span>Select Customer *</span>
                   {selectedCustomer && (
                     <span
                       style={{
@@ -186,7 +183,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                         fontWeight: 700,
                       }}
                     >
-                      Baqi: Rs. {selectedCustomer.currentBalance.toLocaleString()}
+                      Balance Due: Rs. {selectedCustomer.currentBalance.toLocaleString()}
                     </span>
                   )}
                 </label>
@@ -196,10 +193,10 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   className="form-select"
                   required
                 >
-                  <option value="">-- Customer Select Karein --</option>
+                  <option value="">-- Choose Customer --</option>
                   {customers.map((c) => (
                     <option key={c._id} value={c._id}>
-                      {c.name} ({c.area || 'No Area'}) — Baqi: Rs. {c.currentBalance}
+                      {c.name} ({c.area || 'No Area'}) — Unpaid: Rs. {c.currentBalance}
                     </option>
                   ))}
                 </select>
@@ -207,7 +204,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
               {/* Amount */}
               <div className="form-group">
-                <label className="form-label">Wasool Shuda Raqam (Rs.) *</label>
+                <label className="form-label">Amount Received (Rs.) *</label>
                 <input
                   type="number"
                   required
@@ -228,7 +225,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
                   className="form-select"
                 >
-                  <option value="Cash">Cash (Naqad)</option>
+                  <option value="Cash">Cash</option>
                   <option value="EasyPaisa">EasyPaisa</option>
                   <option value="JazzCash">JazzCash</option>
                   <option value="Bank">Bank Transfer</option>
@@ -238,7 +235,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
               {/* Date */}
               <div className="form-group">
-                <label className="form-label">Payment Date</label>
+                <label className="form-label">Date</label>
                 <input
                   type="date"
                   value={formData.date}
@@ -266,7 +263,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="form-input"
-                  placeholder="e.g. Received via delivery boy Ali"
+                  placeholder="e.g. Received via delivery rider"
                 />
               </div>
             </div>
@@ -278,7 +275,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                 className="btn btn-success btn-lg"
                 style={{ minWidth: 200 }}
               >
-                {submitting ? 'Recording...' : <><CheckCircle2 size={18} /> Wasooli Save Karein</>}
+                {submitting ? 'Recording...' : <><CheckCircle2 size={18} /> Save Payment</>}
               </button>
             </div>
           </form>
@@ -288,7 +285,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
         <div className="card">
           <div className="card-header">
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Receipt size={18} color="var(--primary)" /> Halia Wasooliyan (Recent Payments)
+              <Receipt size={18} color="var(--primary)" /> Recent Payment Logs
             </h3>
           </div>
 
@@ -298,7 +295,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
             </div>
           ) : payments.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
-              Abhi tak koi payment entry nahi hui.
+              No payments recorded yet.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>

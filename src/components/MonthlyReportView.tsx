@@ -1,17 +1,12 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText,
   Download,
   Calendar,
-  Users,
-  Printer,
   MessageCircle,
   CheckCircle,
-  AlertCircle,
-  Building2,
-  Phone,
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { generateCustomerMonthlyPDF, MonthlyReportData } from '@/lib/pdfGenerator';
@@ -42,7 +37,6 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
   const [downloading, setDownloading] = useState(false);
   const toast = useToast();
 
-  // Load customer list
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
@@ -96,7 +90,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     setDownloading(true);
     try {
       generateCustomerMonthlyPDF(reportData);
-      toast.success(`PDF Bill downloaded successfully for ${reportData.customer.name}!`);
+      toast.success(`PDF Bill downloaded for ${reportData.customer.name}!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error generating PDF';
       toast.error(msg);
@@ -111,16 +105,17 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     const currency = reportData.plant.currency || 'Rs.';
 
     const text =
-      `*Assalam-o-Alaikum ${reportData.customer.name} Sahab,*\n` +
-      `*${reportData.plant.name}* ki janib se aapka *${reportData.month}* ka monthly water bill:\n\n` +
-      `• Pichla Baqi: ${currency} ${reportData.openingBalance.toLocaleString()}\n` +
-      `• Is Mahine Ki Bottles: ${reportData.monthBottlesDelivered} Cans\n` +
-      `• Current Month Bill: ${currency} ${reportData.monthBilling.toLocaleString()}\n` +
-      `• Wasool Shuda Payment: ${currency} ${reportData.monthPaymentsTotal.toLocaleString()}\n` +
+      `*Water Delivery Bill - ${reportData.plant.name}*\n` +
+      `Dear ${reportData.customer.name},\n` +
+      `Here is your monthly water bill for *${reportData.month}*:\n\n` +
+      `• Previous Balance: ${currency} ${reportData.openingBalance.toLocaleString()}\n` +
+      `• Bottles Delivered This Month: ${reportData.monthBottlesDelivered} Cans\n` +
+      `• Current Month Charges: ${currency} ${reportData.monthBilling.toLocaleString()}\n` +
+      `• Total Payments Received: ${currency} ${reportData.monthPaymentsTotal.toLocaleString()}\n` +
       `---------------------------------\n` +
-      `*KUL WAJIB-UL-ADA (NET PAYABLE): ${currency} ${reportData.closingBalance.toLocaleString()}*\n` +
-      `• Khali Cans Baqi: ${reportData.totalBottlesWithCustomer} Cans\n\n` +
-      `Baraye mehrbani hisab bebaaq farmayein. Shukriya!`;
+      `*TOTAL BALANCE DUE: ${currency} ${reportData.closingBalance.toLocaleString()}*\n` +
+      `• Empty Bottles with Customer: ${reportData.totalBottlesWithCustomer} Cans\n\n` +
+      `Thank you for your business!`;
 
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
@@ -144,10 +139,10 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
       >
         <div>
           <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={24} color="var(--primary)" /> Monthly Customer Bill & PDF Ledger
+            <FileText size={24} color="var(--primary)" /> Monthly Customer Bill & PDF
           </h2>
           <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Customer ka mahana hisab kitab aur PDF bill download karein
+            View month-wise delivery statement and download printable PDF invoice
           </p>
         </div>
 
@@ -184,13 +179,13 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
         }}
       >
         <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Customer Select Karein</label>
+          <label className="form-label">Select Customer</label>
           <select
             value={selectedCustomerId}
             onChange={(e) => setSelectedCustomerId(e.target.value)}
             className="form-select"
           >
-            <option value="">-- Customer Select Karein --</option>
+            <option value="">-- Choose Customer --</option>
             {customers.map((c) => (
               <option key={c._id} value={c._id}>
                 {c.name} {c.area ? `(${c.area})` : ''}
@@ -218,29 +213,29 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
             style={{ width: '100%' }}
             disabled={loading}
           >
-            {loading ? 'Refreshing...' : 'Report Refresh Karein'}
+            {loading ? 'Refreshing...' : 'Refresh Statement'}
           </button>
         </div>
       </div>
 
-      {/* Ledger Preview Card */}
+      {/* Statement Preview Card */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-          Generating ledger calculations...
+          Calculating statement...
         </div>
       ) : !reportData ? (
         <div className="card empty-state">
           <div className="empty-icon">
             <FileText size={32} />
           </div>
-          <h3>Customer aur Month Select Karein</h3>
+          <h3>Select Customer & Month</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            Upar diye gaye menu se customer aur mahina muntakhib karein taake bill display ho.
+            Choose a customer from the dropdown above to view their monthly statement.
           </p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 24 }}>
-          {/* Printable Water Plant Bill Header */}
+        <div className="card" style={{ padding: 22 }}>
+          {/* Printable Header */}
           <div
             style={{
               borderBottom: '2px solid var(--border-color)',
@@ -255,7 +250,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           >
             <div>
               <span className="badge badge-info" style={{ marginBottom: 6 }}>
-                OFFICIAL WATER BILL
+                MONTHLY STATEMENT
               </span>
               <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)' }}>
                 {reportData.plant.name}
@@ -266,15 +261,15 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>Billing Period</div>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>Period</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{reportData.month}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-sub)' }}>
-                Issued: {new Date().toLocaleDateString('en-GB')}
+                Generated: {new Date().toLocaleDateString('en-GB')}
               </div>
             </div>
           </div>
 
-          {/* Customer Detail Banner */}
+          {/* Customer Details Box */}
           <div
             style={{
               background: '#f8fafc',
@@ -305,10 +300,10 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
             <div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate & Bottles</div>
               <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>
-                Rs. {reportData.customer.ratePerBottle} / Can
+                Rs. {reportData.customer.ratePerBottle} / bottle
               </div>
               <div style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 600 }}>
-                Cans Held: {reportData.totalBottlesWithCustomer} empty bottles
+                Empty Bottles Held: {reportData.totalBottlesWithCustomer} cans
               </div>
             </div>
           </div>
@@ -331,7 +326,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               }}
             >
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                Previous Balance (Pichla Baqi)
+                Previous Balance
               </div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: 4 }}>
                 Rs. {reportData.openingBalance.toLocaleString()}
@@ -347,7 +342,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               }}
             >
               <div style={{ fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 600 }}>
-                Month Deliveries ({reportData.monthBottlesDelivered} Cans)
+                This Month Deliveries ({reportData.monthBottlesDelivered} Cans)
               </div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d4ed8', marginTop: 4 }}>
                 Rs. {reportData.monthBilling.toLocaleString()}
@@ -379,7 +374,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               }}
             >
               <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>
-                Kul Wajib-ul-Ada (Net Balance)
+                Total Balance Due
               </div>
               <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#b91c1c', marginTop: 4 }}>
                 Rs. {reportData.closingBalance.toLocaleString()}
@@ -389,13 +384,13 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
 
           {/* Daily Delivery Entries Breakdown Table */}
           <div style={{ marginBottom: 20 }}>
-            <h4 style={{ fontSize: '0.98rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Calendar size={16} color="var(--primary)" /> Rozmarrah ki Supply (Daily Delivery Log)
+            <h4 style={{ fontSize: '0.96rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Calendar size={16} color="var(--primary)" /> Daily Deliveries Log
             </h4>
 
             {reportData.monthDeliveries.length === 0 ? (
-              <div style={{ padding: '16px', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                Is mahine koi bottle delivery darj nahi hai.
+              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No bottle deliveries recorded in this month.
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -441,17 +436,17 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           {/* Payments Received Breakdown */}
           {reportData.monthPayments.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <h4 style={{ fontSize: '0.98rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CheckCircle size={16} color="var(--success)" /> Is Mahine Ki Wasooli (Payments Made)
+              <h4 style={{ fontSize: '0.96rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle size={16} color="var(--success)" /> Payments Received This Month
               </h4>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                   <thead>
                     <tr style={{ background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', textAlign: 'left' }}>
                       <th style={{ padding: '8px 10px' }}>Date</th>
-                      <th style={{ padding: '8px 10px' }}>Payment Method</th>
+                      <th style={{ padding: '8px 10px' }}>Method</th>
                       <th style={{ padding: '8px 10px' }}>Receipt #</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount Paid</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -471,7 +466,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
             </div>
           )}
 
-          {/* Download PDF Big CTA */}
+          {/* Download Action Footer */}
           <div
             style={{
               paddingTop: 16,
@@ -484,19 +479,19 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
             }}
           >
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Aap is bill ko direct PDF me save kar k customer ko WhatsApp bhej sakte hain ya print nikal sakte hain.
+              Click below to save this official invoice as a PDF file or send to WhatsApp.
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={handleWhatsAppShare} className="btn btn-secondary" style={{ color: '#16a34a' }}>
-                <MessageCircle size={16} /> WhatsApp Par Bheinjein
+                <MessageCircle size={16} /> Send via WhatsApp
               </button>
               <button
                 onClick={handleDownloadPDF}
                 disabled={downloading}
                 className="btn btn-primary btn-lg"
               >
-                <Download size={18} /> {downloading ? 'Downloading...' : 'PDF Bill Download Karein'}
+                <Download size={18} /> {downloading ? 'Downloading...' : 'Download PDF Bill'}
               </button>
             </div>
           </div>
