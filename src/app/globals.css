@@ -636,3 +636,27 @@ a {
   align-items: center;
   justify-content: center;
 }
+
+/* ===== Mobile/Desktop Responsive Helpers ===== */
+/* Payment page */
+.payment-mobile-list { display: none; }
+.payment-desktop-table { display: block; }
+
+/* Monthly report page */
+.report-mobile-list { display: none; }
+.report-desktop-table { display: block; }
+
+@media (max-width: 640px) {
+  .payment-mobile-list { display: block; }
+  .payment-desktop-table { display: none; }
+  .report-mobile-list { display: block; }
+  .report-desktop-table { display: none; }
+
+  /* Prevent any wide element from causing horizontal scroll */
+  .page-container {
+    overflow-x: hidden;
+  }
+  .card {
+    overflow-x: hidden;
+  }
+}

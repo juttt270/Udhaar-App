@@ -69,8 +69,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
       if (initialCustomerId) {
         setFormData((prev) => ({ ...prev, customerId: initialCustomerId }));
-      } else if (!formData.customerId && custData.customers?.length > 0) {
-        setFormData((prev) => ({ ...prev, customerId: custData.customers[0]._id }));
       }
     } catch {
       toast.error('Failed to load payments or customer list');
@@ -147,8 +145,8 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
   return (
     <div className="page-container">
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Wallet size={24} color="var(--success)" /> Payments / Cash Received
+        <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Wallet size={22} color="var(--success)" /> Payments / Cash Received
         </h2>
         <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
           Record customer payments received in cash or online transfer
@@ -165,46 +163,47 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
           </div>
 
           <form onSubmit={handleSubmit}>
+            {/* Customer + Balance badge */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 4 }}>
+                <span>Select Customer *</span>
+                {selectedCustomer && (
+                  <span
+                    style={{
+                      color: selectedCustomer.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    Due: Rs.{selectedCustomer.currentBalance.toLocaleString()}
+                  </span>
+                )}
+              </label>
+              <select
+                value={formData.customerId}
+                onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
+                className="form-select"
+                required
+              >
+                <option value="">-- Choose Customer --</option>
+                {customers.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name} {c.area ? `(${c.area})` : ''} — Due: Rs.{c.currentBalance}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Amount + Method row */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                 gap: 12,
               }}
             >
-              {/* Customer Selector */}
               <div className="form-group">
-                <label className="form-label">
-                  <span>Select Customer *</span>
-                  {selectedCustomer && (
-                    <span
-                      style={{
-                        color: selectedCustomer.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
-                        fontWeight: 700,
-                      }}
-                    >
-                      Balance Due: Rs. {selectedCustomer.currentBalance.toLocaleString()}
-                    </span>
-                  )}
-                </label>
-                <select
-                  value={formData.customerId}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="form-select"
-                  required
-                >
-                  <option value="">-- Choose Customer --</option>
-                  {customers.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name} ({c.area || 'No Area'}) — Unpaid: Rs. {c.currentBalance}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Amount */}
-              <div className="form-group">
-                <label className="form-label">Amount Received (Rs.) *</label>
+                <label className="form-label">Amount (Rs.) *</label>
                 <input
                   type="number"
                   required
@@ -217,7 +216,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                 />
               </div>
 
-              {/* Payment Method */}
               <div className="form-group">
                 <label className="form-label">Payment Method</label>
                 <select
@@ -233,7 +231,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                 </select>
               </div>
 
-              {/* Date */}
               <div className="form-group">
                 <label className="form-label">Date</label>
                 <input
@@ -245,7 +242,15 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 4 }}>
+            {/* Receipt + Notes row — stacks on mobile */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 12,
+                marginTop: 4,
+              }}
+            >
               <div className="form-group">
                 <label className="form-label">Receipt / Slip No.</label>
                 <input
@@ -263,17 +268,17 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="form-input"
-                  placeholder="e.g. Received via delivery rider"
+                  placeholder="e.g. Paid via rider"
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               <button
                 type="submit"
                 disabled={submitting}
                 className="btn btn-success btn-lg"
-                style={{ minWidth: 200 }}
+                style={{ width: '100%' }}
               >
                 {submitting ? 'Recording...' : <><CheckCircle2 size={18} /> Save Payment</>}
               </button>
@@ -281,7 +286,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
           </form>
         </div>
 
-        {/* Recent Payments History Table */}
+        {/* Recent Payments History — card-style on mobile */}
         <div className="card">
           <div className="card-header">
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -298,51 +303,100 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
               No payments recorded yet.
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                    <th style={{ padding: '10px 12px' }}>Date</th>
-                    <th style={{ padding: '10px 12px' }}>Customer</th>
-                    <th style={{ padding: '10px 12px' }}>Method</th>
-                    <th style={{ padding: '10px 12px' }}>Receipt #</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>{p.date}</td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <div style={{ fontWeight: 700 }}>{p.customerId?.name || 'Customer'}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {p.customerId?.area || p.customerId?.phone || ''}
-                        </div>
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>
+            <>
+              {/* Mobile card list */}
+              <div className="payment-mobile-list">
+                {payments.map((p) => (
+                  <div
+                    key={p._id}
+                    style={{
+                      padding: '12px 14px',
+                      borderBottom: '1px solid #f1f5f9',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: 2 }}>
+                        {p.customerId?.name || 'Customer'}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+                        {p.date} &nbsp;·&nbsp; {p.customerId?.area || p.customerId?.phone || ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span className="badge badge-success">{p.paymentMethod}</span>
-                      </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        {p.receiptNo || '-'}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--success)' }}>
-                        Rs. {p.amount.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleDelete(p._id)}
-                          className="toast-close"
-                          title="Delete entry"
-                        >
-                          <Trash2 size={15} color="var(--danger)" />
-                        </button>
-                      </td>
+                        {p.receiptNo && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            #{p.receiptNo}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontWeight: 800, color: 'var(--success)', fontSize: '1rem' }}>
+                        Rs.{p.amount.toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => handleDelete(p._id)}
+                        className="toast-close"
+                        title="Delete entry"
+                      >
+                        <Trash2 size={15} color="var(--danger)" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table — hidden on mobile via CSS */}
+              <div className="payment-desktop-table" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                      <th style={{ padding: '10px 12px' }}>Date</th>
+                      <th style={{ padding: '10px 12px' }}>Customer</th>
+                      <th style={{ padding: '10px 12px' }}>Method</th>
+                      <th style={{ padding: '10px 12px' }}>Receipt #</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center' }}>Del</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => (
+                      <tr key={p._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.date}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontWeight: 700 }}>{p.customerId?.name || 'Customer'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {p.customerId?.area || p.customerId?.phone || ''}
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span className="badge badge-success">{p.paymentMethod}</span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          {p.receiptNo || '-'}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>
+                          Rs.{p.amount.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDelete(p._id)}
+                            className="toast-close"
+                            title="Delete entry"
+                          >
+                            <Trash2 size={15} color="var(--danger)" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
