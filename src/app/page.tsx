@@ -8,6 +8,8 @@ import {
   Users,
   Wallet,
   FileText,
+  ShieldCheck,
+  TrendingUp,
   Settings,
   LogOut,
   Building2,
@@ -21,6 +23,8 @@ import DailyEntryView from '@/components/DailyEntryView';
 import CustomersView from '@/components/CustomersView';
 import PaymentsView from '@/components/PaymentsView';
 import MonthlyReportView from '@/components/MonthlyReportView';
+import BottleDepositView from '@/components/BottleDepositView';
+import RevenueProfitView from '@/components/RevenueProfitView';
 import SettingsView from '@/components/SettingsView';
 import { useToast } from '@/components/Toast';
 
@@ -37,7 +41,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [hasAnyAdmin, setHasAnyAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'daily' | 'customers' | 'payments' | 'reports' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'daily' | 'customers' | 'payments' | 'deposits' | 'revenue' | 'reports' | 'settings'>('dashboard');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [openAddCustomer, setOpenAddCustomer] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -157,6 +161,8 @@ export default function HomePage() {
     { id: 'daily', label: 'Daily Delivery', icon: CalendarCheck2 },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'payments', label: 'Payments', icon: Wallet },
+    { id: 'deposits', label: 'Bottle Security', icon: ShieldCheck },
+    { id: 'revenue', label: 'Revenue & Profit', icon: TrendingUp },
     { id: 'reports', label: 'Bills & PDF', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -351,6 +357,14 @@ export default function HomePage() {
 
         {activeTab === 'payments' && (
           <PaymentsView initialCustomerId={selectedCustomerId} />
+        )}
+
+        {activeTab === 'deposits' && (
+          <BottleDepositView />
+        )}
+
+        {activeTab === 'revenue' && (
+          <RevenueProfitView />
         )}
 
         {activeTab === 'reports' && (

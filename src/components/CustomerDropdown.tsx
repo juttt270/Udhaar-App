@@ -18,6 +18,7 @@ interface CustomerDropdownProps {
   placeholder?: string;
   showBalance?: boolean;
   disabled?: boolean;
+  label?: string;
 }
 
 export default function CustomerDropdown({
@@ -46,7 +47,8 @@ export default function CustomerDropdown({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      // On desktop, click outside closes
+      if (window.innerWidth > 640 && containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery('');
       }
@@ -59,7 +61,7 @@ export default function CustomerDropdown({
     if (disabled) return;
     setOpen(true);
     setQuery('');
-    setTimeout(() => inputRef.current?.focus(), 50);
+    setTimeout(() => inputRef.current?.focus(), 60);
   }, [disabled]);
 
   const handleSelect = (id: string) => {
@@ -85,7 +87,7 @@ export default function CustomerDropdown({
         style={{
           width: '100%',
           minHeight: 42,
-          padding: '9px 36px 9px 12px',
+          padding: '9px 12px',
           border: `1.5px solid ${open ? 'var(--primary)' : 'var(--border-color)'}`,
           borderRadius: 'var(--radius-sm)',
           background: disabled ? '#f8fafc' : 'var(--bg-input)',
@@ -126,12 +128,13 @@ export default function CustomerDropdown({
             placeholder
           )}
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {selected && !disabled && (
             <span
               role="button"
               onClick={handleClear}
               style={{ cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}
+              title="Clear selection"
             >
               <X size={14} />
             </span>
@@ -144,119 +147,132 @@ export default function CustomerDropdown({
         </div>
       </button>
 
-      {/* Dropdown panel */}
+      {/* Dropdown panel & mobile modal */}
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            background: '#ffffff',
-            border: '1.5px solid var(--primary)',
-            borderRadius: 'var(--radius-sm)',
-            boxShadow: 'var(--shadow-lg)',
-            zIndex: 200,
-            maxHeight: 300,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {/* Search */}
+        <>
+          {/* Mobile backdrop */}
           <div
-            style={{
-              padding: '8px 10px',
-              borderBottom: '1px solid var(--border-color)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: '#f8fafc',
-              borderTopLeftRadius: 'var(--radius-sm)',
-              borderTopRightRadius: 'var(--radius-sm)',
+            className="dropdown-mobile-backdrop"
+            onClick={() => {
+              setOpen(false);
+              setQuery('');
             }}
-          >
-            <Search size={14} color="var(--text-muted)" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, area or phone..."
-              style={{
-                flex: 1,
-                border: 'none',
-                outline: 'none',
-                background: 'transparent',
-                fontSize: '0.86rem',
-                fontFamily: 'inherit',
-                color: 'var(--text-main)',
-              }}
-            />
-            {query && (
+          />
+
+          <div className="dropdown-panel-responsive">
+            {/* Mobile Header with title and close X */}
+            <div className="dropdown-mobile-header">
+              <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                Select Customer
+              </span>
               <button
                 type="button"
-                onClick={() => setQuery('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                onClick={() => {
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className="toast-close"
+                style={{ padding: 4 }}
               >
-                <X size={12} />
+                <X size={18} />
               </button>
-            )}
-          </div>
+            </div>
 
-          {/* Options */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '16px 12px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
-                No customer found
-              </div>
-            ) : (
-              filtered.map((c) => (
+            {/* Search */}
+            <div
+              style={{
+                padding: '10px 12px',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#f8fafc',
+              }}
+            >
+              <Search size={16} color="var(--primary)" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name, area or phone..."
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  fontSize: '0.9rem',
+                  fontFamily: 'inherit',
+                  color: 'var(--text-main)',
+                }}
+              />
+              {query && (
                 <button
-                  key={c._id}
                   type="button"
-                  onClick={() => handleSelect(c._id)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: 'none',
-                    borderBottom: '1px solid #f1f5f9',
-                    background: c._id === value ? 'var(--primary-light)' : '#ffffff',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
+                  onClick={() => setQuery('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                      {c.name}
-                    </div>
-                    {(c.area || c.phone) && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                        {[c.area, c.phone].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                  </div>
-                  {showBalance && c.currentBalance !== undefined && (
-                    <span
-                      style={{
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: c.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      Rs.{c.currentBalance.toLocaleString()}
-                    </span>
-                  )}
+                  <X size={14} />
                 </button>
-              ))
-            )}
+              )}
+            </div>
+
+            {/* Options list */}
+            <div style={{ overflowY: 'auto', flex: 1, maxHeight: '350px' }}>
+              {filtered.length === 0 ? (
+                <div style={{ padding: '24px 12px', color: 'var(--text-muted)', fontSize: '0.88rem', textAlign: 'center' }}>
+                  No customer matching &quot;{query}&quot;
+                </div>
+              ) : (
+                filtered.map((c) => (
+                  <button
+                    key={c._id}
+                    type="button"
+                    onClick={() => handleSelect(c._id)}
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      background: c._id === value ? 'var(--primary-light)' : '#ffffff',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 10,
+                      transition: 'background 0.15s ease',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                        {c.name}
+                      </div>
+                      {(c.area || c.phone) && (
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {[c.area, c.phone].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    {showBalance && c.currentBalance !== undefined && (
+                      <span
+                        style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          color: c.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Rs.{c.currentBalance.toLocaleString()}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import {
   FileText,
   CalendarCheck2,
   TrendingUp,
+  ShieldCheck,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -303,6 +304,66 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
         </div>
 
         <div
+          onClick={() => onNavigate('deposits')}
+          className="card"
+          style={{ cursor: 'pointer', borderLeft: '4px solid #0284c7' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 'var(--radius-sm)',
+                background: '#e0f2fe',
+                color: '#0284c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ShieldCheck size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: '0.96rem' }}>Bottle Security</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Track bottle amanat cash
+              </p>
+            </div>
+            <ArrowRight size={15} color="var(--text-sub)" />
+          </div>
+        </div>
+
+        <div
+          onClick={() => onNavigate('revenue')}
+          className="card"
+          style={{ cursor: 'pointer', borderLeft: '4px solid #10b981' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 'var(--radius-sm)',
+                background: '#ecfdf5',
+                color: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <TrendingUp size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: '0.96rem' }}>Revenue & Profit</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Daily wholesale & profit ledger
+              </p>
+            </div>
+            <ArrowRight size={15} color="var(--text-sub)" />
+          </div>
+        </div>
+
+        <div
           onClick={() => onNavigate('customers')}
           className="card"
           style={{ cursor: 'pointer', borderLeft: '4px solid #f59e0b' }}
@@ -338,7 +399,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <TrendingUp size={18} color="var(--danger)" />
-            <h3 style={{ fontSize: '1rem' }}>Top Unpaid Customers (Pending Balances)</h3>
+            <h3 style={{ fontSize: '1rem' }}>Top Unpaid Customers</h3>
           </div>
           <button
             onClick={() => onNavigate('customers')}
