@@ -66,11 +66,14 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     receiptNo: `REC-${Date.now().toString().slice(-5)}`,
   });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
 
   const toast = useToast();
   const submittingRef = useRef(false);
   const savingDeliveryRef = useRef(false);
   const savingPaymentRef = useRef(false);
+  const deletingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -136,11 +139,13 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submittingRef.current) return;
+    if (submittingRef.current || savingCustomer) return;
     if (!formData.name.trim()) {
       toast.warning('Customer name is required');
       return;
     }
+    submittingRef.current = true;
+    setSavingCustomer(true);
 
     try {
       const isEdit = !!editingCustomer;
@@ -165,6 +170,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       toast.error(msg);
     } finally {
       submittingRef.current = false;
+      setSavingCustomer(false);
     }
   };
 
@@ -240,6 +246,9 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
   };
 
   const handleDelete = async (id: string) => {
+    if (deletingRef.current || deletingCustomer) return;
+    deletingRef.current = true;
+    setDeletingCustomer(true);
     try {
       const res = await fetch(`/api/customers?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -251,6 +260,9 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       toast.error(msg);
+    } finally {
+      deletingRef.current = false;
+      setDeletingCustomer(false);
     }
   };
 
@@ -635,16 +647,28 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div className="form-group">
                     <label className="form-label">Payment Method</label>
-                    <select
-                      value={paymentData.paymentMethod}
-                      onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value })}
-                      className="form-select"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="EasyPaisa">EasyPaisa</option>
-                      <option value="JazzCash">JazzCash</option>
-                      <option value="Bank">Bank Transfer</option>
-                    </select>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {['Cash', 'EasyPaisa', 'JazzCash', 'Bank'].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setPaymentData({ ...paymentData, paymentMethod: m })}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: paymentData.paymentMethod === m ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: paymentData.paymentMethod === m ? 'var(--primary)' : '#f8fafc',
+                            color: paymentData.paymentMethod === m ? '#ffffff' : 'var(--text-main)',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="form-group">
@@ -798,8 +822,8 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingCustomer ? 'Update Customer' : 'Save Customer'}
+                <button type="submit" disabled={savingCustomer} className="btn btn-primary" style={{ minWidth: 140 }}>
+                  {savingCustomer ? 'Saving...' : editingCustomer ? 'Update Customer' : 'Save Customer'}
                 </button>
               </div>
             </form>
@@ -824,8 +848,8 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
               <button onClick={() => setDeleteConfirmId(null)} className="btn btn-secondary">
                 Cancel
               </button>
-              <button onClick={() => handleDelete(deleteConfirmId)} className="btn btn-danger">
-                Delete Customer
+              <button onClick={() => handleDelete(deleteConfirmId)} disabled={deletingCustomer} className="btn btn-danger">
+                {deletingCustomer ? 'Deleting...' : 'Delete Customer'}
               </button>
             </div>
           </div>

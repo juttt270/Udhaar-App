@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Droplets,
-  RotateCcw,
   Wallet,
   Users,
   AlertTriangle,
@@ -124,7 +123,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
             Today: {todayFormatted}
           </span>
           <h1 style={{ fontSize: '1.5rem', marginTop: 6, color: '#ffffff' }}>
-            {plantName || 'Water Plant Dashboard'}
+            {plantName || 'AB Water Filter Dashboard'}
           </h1>
           <p style={{ fontSize: '0.86rem', opacity: 0.9, marginTop: 2 }}>
             Manage daily deliveries, customer accounts, and monthly bills easily.
@@ -158,7 +157,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
         </div>
       </div>
 
-      {/* 4 Primary KPI Cards */}
+      {/* 3 Primary KPI Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-header">
@@ -173,19 +172,6 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div className="stat-hint">
             Bill: Rs. {(stats?.today?.billedAmount || 0).toLocaleString()}
           </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <span>Empty Bottles Collected</span>
-            <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-              <RotateCcw size={18} />
-            </div>
-          </div>
-          <div className="stat-value">
-            {loading ? '...' : `${stats?.today?.bottlesReturned || 0} Empty`}
-          </div>
-          <div className="stat-hint">Returned by customers today</div>
         </div>
 
         <div className="stat-card">

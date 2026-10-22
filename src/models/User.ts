@@ -18,7 +18,7 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    plantName: { type: String, required: true, default: 'Pure Aqua Water Plant', trim: true },
+    plantName: { type: String, required: true, default: 'AB Water Filter', trim: true },
     phone: { type: String, default: '', trim: true },
     address: { type: String, default: '', trim: true },
     currency: { type: String, default: 'Rs.', trim: true },

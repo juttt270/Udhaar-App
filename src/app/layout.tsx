@@ -3,9 +3,9 @@ import './globals.css';
 import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
-  title: 'Water Plant Khata & Monthly Udhaar Manager',
+  title: 'AB Water Filter - Udhaar & Monthly Billing Manager',
   description:
-    'Complete management software for water plants: Daily delivery entries, monthly customer credit ledger, cash wasooli, and instant PDF bill generation.',
+    'Complete management software for AB Water Filter: Daily delivery entries, monthly customer credit ledger, cash wasooli, and instant PDF bill generation.',
 };
 
 export default function RootLayout({

@@ -134,7 +134,7 @@ export default function HomePage() {
           <Droplet size={28} />
         </div>
         <div style={{ fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Loading Water Plant System...
+          Loading AB Water Filter...
         </div>
       </div>
     );
@@ -212,7 +212,7 @@ export default function HomePage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {currentUser.plantName || 'Water Plant'}
+                AB Water Filter
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700 }}>
                 UDHAAR & BILLING
@@ -314,11 +314,9 @@ export default function HomePage() {
               <Menu size={18} />
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Building2 size={18} color="var(--primary)" />
-              <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
-                {currentUser.plantName}
-              </span>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)', letterSpacing: '0.01em' }}>
+              <span className="mobile-header-brand">AB</span>
+              <span className="desktop-header-brand">AB Water Filter</span>
             </div>
           </div>
 

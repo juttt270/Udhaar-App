@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
         month,
         generatedAt: new Date().toISOString(),
         plant: {
-          name: user?.plantName || 'Water Plant',
+          name: user?.plantName || 'AB Water Filter',
           phone: user?.phone || '',
           address: user?.address || '',
           currency: user?.currency || 'Rs.',

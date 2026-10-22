@@ -1,10 +1,9 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet,
   PlusCircle,
-  Receipt,
   Trash2,
   CheckCircle2,
 } from 'lucide-react';
@@ -24,7 +23,7 @@ interface PaymentRecord {
   date: string;
   amount: number;
   paymentMethod: string;
-  receiptNo: string;
+  receiptNo?: string;
   notes?: string;
   customerId: {
     _id: string;
@@ -38,11 +37,14 @@ interface PaymentsViewProps {
   initialCustomerId?: string;
 }
 
+const PAYMENT_METHODS = ['Cash', 'EasyPaisa', 'JazzCash', 'Bank', 'Other'];
+
 export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const toast = useToast();
   const submittingRef = useRef(false);
   const deletingRef = useRef(false);
@@ -52,7 +54,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
     amount: '',
     paymentMethod: 'Cash',
     date: new Date().toISOString().split('T')[0],
-    receiptNo: `REC-${Date.now().toString().slice(-5)}`,
     notes: '',
   });
 
@@ -88,13 +89,13 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submittingRef.current) return;
+    if (submittingRef.current || submitting) return;
     if (!formData.customerId) {
-      toast.warning('Please select a customer');
+      toast.warning('Please select a customer first');
       return;
     }
     if (!formData.amount || Number(formData.amount) <= 0) {
-      toast.warning('Please enter a valid amount');
+      toast.warning('Please enter a valid payment amount');
       return;
     }
 
@@ -105,8 +106,11 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          customerId: formData.customerId,
           amount: Number(formData.amount),
+          paymentMethod: formData.paymentMethod,
+          date: formData.date,
+          notes: formData.notes,
         }),
       });
 
@@ -118,7 +122,6 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       setFormData((prev) => ({
         ...prev,
         amount: '',
-        receiptNo: `REC-${Date.now().toString().slice(-5)}`,
         notes: '',
       }));
 
@@ -134,8 +137,9 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this payment record?')) return;
-    if (deletingRef.current) return;
+    if (deletingRef.current || deletingId) return;
     deletingRef.current = true;
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/payments?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -148,6 +152,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       toast.error(msg);
     } finally {
       deletingRef.current = false;
+      setDeletingId(null);
     }
   };
 
@@ -172,7 +177,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Customer + Balance badge */}
+            {/* Custom Searchable Customer Dropdown */}
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 4 }}>
                 <span>Select Customer *</span>
@@ -188,22 +193,16 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   </span>
                 )}
               </label>
-              <select
+              <CustomerDropdown
+                customers={customers}
                 value={formData.customerId}
-                onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                className="form-select"
-                required
-              >
-                <option value="">-- Choose Customer --</option>
-                {customers.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} {c.area ? `(${c.area})` : ''} — Due: Rs.{c.currentBalance}
-                  </option>
-                ))}
-              </select>
+                onChange={(id) => setFormData((prev) => ({ ...prev, customerId: id }))}
+                placeholder="-- Search by customer name, area, or phone --"
+                showBalance={true}
+              />
             </div>
 
-            {/* Amount + Method row */}
+            {/* Amount & Date */}
             <div
               style={{
                 display: 'grid',
@@ -218,7 +217,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                   required
                   min="1"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
                   className="form-input"
                   placeholder="e.g. 1500"
                   style={{ fontWeight: 700, fontSize: '1.05rem' }}
@@ -226,70 +225,75 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Payment Method</label>
-                <select
-                  value={formData.paymentMethod}
-                  onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="form-select"
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="EasyPaisa">EasyPaisa</option>
-                  <option value="JazzCash">JazzCash</option>
-                  <option value="Bank">Bank Transfer</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">Date</label>
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
                   className="form-input"
                 />
               </div>
             </div>
 
-            {/* Receipt + Notes row — stacks on mobile */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: 12,
-                marginTop: 4,
-              }}
-            >
-              <div className="form-group">
-                <label className="form-label">Receipt / Slip No.</label>
-                <input
-                  type="text"
-                  value={formData.receiptNo}
-                  onChange={(e) => setFormData({ ...formData, receiptNo: e.target.value })}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Notes (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="form-input"
-                  placeholder="e.g. Paid via rider"
-                />
+            {/* Payment Method Pills */}
+            <div className="form-group" style={{ marginTop: 2 }}>
+              <label className="form-label">Payment Method</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {PAYMENT_METHODS.map((m) => {
+                  const isSelected = formData.paymentMethod === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, paymentMethod: m }))}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                        background: isSelected ? 'var(--primary)' : '#ffffff',
+                        color: isSelected ? '#ffffff' : 'var(--text-main)',
+                        fontWeight: 700,
+                        fontSize: '0.84rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div style={{ marginTop: 12 }}>
+            {/* Notes row */}
+            <div className="form-group" style={{ marginTop: 6 }}>
+              <label className="form-label">Notes / Remarks (Optional)</label>
+              <input
+                type="text"
+                value={formData.notes}
+                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                className="form-input"
+                placeholder="e.g. Cleared monthly bill, payment received by driver"
+              />
+            </div>
+
+            <div style={{ marginTop: 14 }}>
               <button
                 type="submit"
                 disabled={submitting}
                 className="btn btn-success btn-lg"
-                style={{ width: '100%' }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
-                {submitting ? 'Recording...' : <><CheckCircle2 size={18} /> Save Payment</>}
+                {submitting ? (
+                  <>
+                    <span className="spinner" style={{ width: 18, height: 18, border: '2px solid #ffffff', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    Recording Payment...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} /> Save Payment
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -299,7 +303,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
         <div className="card">
           <div className="card-header">
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Receipt size={18} color="var(--primary)" /> Recent Payment Logs
+              <Wallet size={18} color="var(--primary)" /> Recent Payment Logs
             </h3>
           </div>
 
@@ -336,9 +340,9 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span className="badge badge-success">{p.paymentMethod}</span>
-                        {p.receiptNo && (
+                        {p.notes && (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            #{p.receiptNo}
+                            {p.notes}
                           </span>
                         )}
                       </div>
@@ -349,10 +353,11 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                       </span>
                       <button
                         onClick={() => handleDelete(p._id)}
+                        disabled={deletingId === p._id}
                         className="toast-close"
                         title="Delete entry"
                       >
-                        <Trash2 size={15} color="var(--danger)" />
+                        <Trash2 size={15} color={deletingId === p._id ? 'var(--text-muted)' : 'var(--danger)'} />
                       </button>
                     </div>
                   </div>
@@ -367,7 +372,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                       <th style={{ padding: '10px 12px' }}>Date</th>
                       <th style={{ padding: '10px 12px' }}>Customer</th>
                       <th style={{ padding: '10px 12px' }}>Method</th>
-                      <th style={{ padding: '10px 12px' }}>Receipt #</th>
+                      <th style={{ padding: '10px 12px' }}>Notes</th>
                       <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount</th>
                       <th style={{ padding: '10px 12px', textAlign: 'center' }}>Del</th>
                     </tr>
@@ -386,7 +391,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                           <span className="badge badge-success">{p.paymentMethod}</span>
                         </td>
                         <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                          {p.receiptNo || '-'}
+                          {p.notes || '-'}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>
                           Rs.{p.amount.toLocaleString()}
@@ -394,10 +399,11 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <button
                             onClick={() => handleDelete(p._id)}
+                            disabled={deletingId === p._id}
                             className="toast-close"
                             title="Delete entry"
                           >
-                            <Trash2 size={15} color="var(--danger)" />
+                            <Trash2 size={15} color={deletingId === p._id ? 'var(--text-muted)' : 'var(--danger)'} />
                           </button>
                         </td>
                       </tr>

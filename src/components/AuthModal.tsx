@@ -18,7 +18,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
     name: '',
     email: '',
     password: '',
-    plantName: 'Pure Drinking Water Plant',
+    plantName: 'AB Water Filter',
     phone: '',
     address: '',
     defaultRate: 100,
@@ -103,7 +103,7 @@ export default function AuthModal({ hasAnyAdmin, onSuccess }: AuthModalProps) {
                     value={formData.plantName}
                     onChange={handleChange}
                     className="form-input"
-                    placeholder="e.g. Al-Madina Water Plant"
+                    placeholder="e.g. AB Water Filter"
                     style={{ paddingLeft: 36 }}
                   />
                   <Building2 size={16} style={{ position: 'absolute', left: 12, top: 13, color: '#94a3b8' }} />
