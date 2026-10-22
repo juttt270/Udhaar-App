@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Users,
   UserPlus,
@@ -55,7 +55,6 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
   const [deliveryData, setDeliveryData] = useState({
     date: new Date().toISOString().split('T')[0],
     bottlesDelivered: 1,
-    bottlesReturned: 1,
   });
   const [savingDelivery, setSavingDelivery] = useState(false);
 
@@ -69,6 +68,9 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
   const [savingPayment, setSavingPayment] = useState(false);
 
   const toast = useToast();
+  const submittingRef = useRef(false);
+  const savingDeliveryRef = useRef(false);
+  const savingPaymentRef = useRef(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -134,6 +136,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!formData.name.trim()) {
       toast.warning('Customer name is required');
       return;
@@ -160,14 +163,16 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       toast.error(msg);
+    } finally {
+      submittingRef.current = false;
     }
   };
 
   // Quick 1-click delivery logger from customer card
   const handleSaveQuickDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickDeliveryCust) return;
-
+    if (!quickDeliveryCust || savingDeliveryRef.current) return;
+    savingDeliveryRef.current = true;
     setSavingDelivery(true);
     try {
       const res = await fetch('/api/deliveries', {
@@ -179,7 +184,6 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
             {
               customerId: quickDeliveryCust._id,
               bottlesDelivered: Number(deliveryData.bottlesDelivered) || 0,
-              bottlesReturned: Number(deliveryData.bottlesReturned) || 0,
               rate: quickDeliveryCust.ratePerBottle || 100,
             },
           ],
@@ -197,14 +201,15 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       toast.error(msg);
     } finally {
       setSavingDelivery(false);
+      savingDeliveryRef.current = false;
     }
   };
 
   // Quick 1-click payment logger from customer card
   const handleSaveQuickPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickPaymentCust || !paymentData.amount) return;
-
+    if (!quickPaymentCust || !paymentData.amount || savingPaymentRef.current) return;
+    savingPaymentRef.current = true;
     setSavingPayment(true);
     try {
       const res = await fetch('/api/payments', {
@@ -230,6 +235,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       toast.error(msg);
     } finally {
       setSavingPayment(false);
+      savingPaymentRef.current = false;
     }
   };
 
@@ -419,16 +425,16 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     </div>
                   </div>
 
-                  {/* Financial & Bottles Badges */}
+                  {/* Financial Badge */}
                   <div
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 8,
                       background: '#f8fafc',
                       padding: '10px 12px',
                       borderRadius: 'var(--radius-sm)',
                       margin: '10px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}
                   >
                     <div>
@@ -448,13 +454,10 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                         </span>
                       </div>
                     </div>
-
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        Empty Bottles with Customer
-                      </div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>
-                        {cust.bottlesWithCustomer} <span style={{ fontSize: '0.75rem' }}>Cans</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Rate</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Rs. {cust.ratePerBottle} / bottle
                       </div>
                     </div>
                   </div>
@@ -485,7 +488,6 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                       setDeliveryData({
                         date: new Date().toISOString().split('T')[0],
                         bottlesDelivered: 1,
-                        bottlesReturned: 1,
                       });
                     }}
                     className="btn btn-outline-primary btn-sm"
@@ -565,35 +567,21 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div className="form-group">
-                    <label className="form-label">Bottles Delivered</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={deliveryData.bottlesDelivered}
-                      onChange={(e) => setDeliveryData({ ...deliveryData, bottlesDelivered: Number(e.target.value) || 0 })}
-                      className="form-input"
-                      style={{ fontWeight: 700 }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Empty Returned</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={deliveryData.bottlesReturned}
-                      onChange={(e) => setDeliveryData({ ...deliveryData, bottlesReturned: Number(e.target.value) || 0 })}
-                      className="form-input"
-                      style={{ fontWeight: 700 }}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Bottles Delivered</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={deliveryData.bottlesDelivered}
+                    onChange={(e) => setDeliveryData({ ...deliveryData, bottlesDelivered: Number(e.target.value) || 0 })}
+                    className="form-input"
+                    style={{ fontWeight: 700 }}
+                  />
                 </div>
 
                 <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, fontSize: '0.84rem' }}>
-                  Cost: <strong>Rs. {(deliveryData.bottlesDelivered * (quickDeliveryCust.ratePerBottle || 100)).toLocaleString()}</strong> (Rate: Rs. {quickDeliveryCust.ratePerBottle}/can)
+                  Cost: <strong>Rs. {(deliveryData.bottlesDelivered * (quickDeliveryCust.ratePerBottle || 100)).toLocaleString()}</strong> (Rate: Rs. {quickDeliveryCust.ratePerBottle}/bottle)
                 </div>
               </div>
               <div className="modal-footer">

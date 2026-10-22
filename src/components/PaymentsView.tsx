@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet,
   PlusCircle,
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useToast } from './Toast';
+import CustomerDropdown from './CustomerDropdown';
 
 interface CustomerOption {
   _id: string;
@@ -43,6 +44,8 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
+  const submittingRef = useRef(false);
+  const deletingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     customerId: initialCustomerId || '',
@@ -85,6 +88,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!formData.customerId) {
       toast.warning('Please select a customer');
       return;
@@ -94,6 +98,7 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const res = await fetch('/api/payments', {
@@ -123,12 +128,14 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       toast.error(msg);
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this payment record?')) return;
-
+    if (deletingRef.current) return;
+    deletingRef.current = true;
     try {
       const res = await fetch(`/api/payments?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -139,6 +146,8 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       toast.error(msg);
+    } finally {
+      deletingRef.current = false;
     }
   };
 

@@ -367,6 +367,13 @@ export default function HomePage() {
             }}
           />
         )}
+        {/* Footer */}
+        <footer style={{ padding: '14px 20px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', marginTop: 'auto', background: '#fafbfc' }}>
+          Developed by{' '}
+          <a href="https://waqas-portfolio-nine.vercel.app/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>
+            Waqas Munir
+          </a>
+        </footer>
       </main>
 
       {/* Bottom Navigation for Mobile */}
