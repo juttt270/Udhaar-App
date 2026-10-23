@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/mongodb';
 import { Customer } from '@/models/Customer';
+import { BottleDeposit } from '@/models/BottleDeposit';
 import { Delivery } from '@/models/Delivery';
 import { Payment } from '@/models/Payment';
 import { authenticateRequest } from '@/lib/auth';
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       query.$or = [{ name: regex }, { phone: regex }, { area: regex }, { address: regex }];
     }
 
-    const customers = await Customer.find(query).sort({ name: 1 }).lean();
+    const customers = await Customer.find(query).sort({ createdAt: -1 }).lean();
 
     // Calculate balances for each customer via aggregations
     const customerIds = customers.map((c) => c._id);
@@ -129,6 +130,21 @@ export async function POST(req: NextRequest) {
       isActive: true,
       notes: notes?.trim() || '',
     });
+
+    // Auto-link with Bottle Security module
+    const secAmt = Number(body.securityAmount) || 0;
+    const depBottles = Number(depositBottles) >= 0 ? Number(depositBottles) : 1;
+    if (secAmt > 0 || depBottles > 0) {
+      await BottleDeposit.create({
+        userId: new mongoose.Types.ObjectId(session.userId),
+        customerId: newCustomer._id,
+        bottlesDeposited: depBottles || 1,
+        securityAmount: secAmt,
+        depositDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+        notes: 'Initial bottle deposit on customer registration',
+      });
+    }
 
     return NextResponse.json({
       success: true,

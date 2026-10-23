@@ -83,6 +83,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     ratePerBottle: defaultPlantRate || 100,
     initialBalance: 0,
     depositBottles: 1,
+    securityAmount: '' as number | string,
     notes: '',
   });
 
@@ -117,6 +118,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       ratePerBottle: defaultPlantRate || 100,
       initialBalance: 0,
       depositBottles: 1,
+      securityAmount: '',
       notes: '',
     });
     setShowAddModal(true);
@@ -132,6 +134,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       ratePerBottle: cust.ratePerBottle || defaultPlantRate || 100,
       initialBalance: cust.initialBalance || 0,
       depositBottles: cust.depositBottles || 1,
+      securityAmount: '',
       notes: cust.notes || '',
     });
     setShowAddModal(true);
@@ -761,9 +764,9 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
                   <div className="form-group">
-                    <label className="form-label">Bottle Price (Rs.)</label>
+                    <label className="form-label">Bottle Price (Rs.) *</label>
                     <input
                       type="number"
                       required
@@ -785,21 +788,39 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                       }
                       className="form-input"
                     />
-                    <span className="form-hint">Old pending debt (if any)</span>
+                    <span className="form-hint">Old debt (if any)</span>
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Deposit Bottles</label>
                     <input
                       type="number"
+                      min="0"
                       value={formData.depositBottles}
                       onChange={(e) =>
                         setFormData({ ...formData, depositBottles: Number(e.target.value) || 0 })
                       }
                       className="form-input"
                     />
-                    <span className="form-hint">Bottles held</span>
+                    <span className="form-hint">Bottles given</span>
                   </div>
+
+                  {!editingCustomer && (
+                    <div className="form-group">
+                      <label className="form-label">Security Cash (Rs.)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 1500"
+                        value={formData.securityAmount}
+                        onChange={(e) =>
+                          setFormData({ ...formData, securityAmount: e.target.value })
+                        }
+                        className="form-input"
+                      />
+                      <span className="form-hint">Amanat cash</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">

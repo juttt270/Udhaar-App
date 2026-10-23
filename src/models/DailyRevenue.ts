@@ -4,19 +4,19 @@ export interface IDailyExpense {
   id: string;
   title: string;
   amount: number;
-  category?: string;
 }
 
 export interface IDailyRevenue extends Document {
   userId: Types.ObjectId;
   date: string;
   plantCostPerBottle: number;
-  customerBottles: number;
-  customerBilledAmount: number;
+  bottlesSold: number;
+  actualBilled: number;
   cashReceived: number;
-  extraBottles: number;
-  extraCash: number;
+  wholesaleCost: number;
   expenses: IDailyExpense[];
+  totalExpenses: number;
+  netProfit: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -27,7 +27,6 @@ const DailyExpenseSchema = new Schema(
     id: { type: String, required: true },
     title: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
-    category: { type: String, default: 'General', trim: true },
   },
   { _id: false }
 );
@@ -37,12 +36,13 @@ const DailyRevenueSchema = new Schema<IDailyRevenue>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     date: { type: String, required: true, index: true },
     plantCostPerBottle: { type: Number, required: true, default: 35 },
-    customerBottles: { type: Number, default: 0 },
-    customerBilledAmount: { type: Number, default: 0 },
-    cashReceived: { type: Number, default: 0 },
-    extraBottles: { type: Number, default: 0 },
-    extraCash: { type: Number, default: 0 },
+    bottlesSold: { type: Number, required: true, default: 0 },
+    actualBilled: { type: Number, required: true, default: 0 },
+    cashReceived: { type: Number, required: true, default: 0 },
+    wholesaleCost: { type: Number, required: true, default: 0 },
     expenses: [DailyExpenseSchema],
+    totalExpenses: { type: Number, required: true, default: 0 },
+    netProfit: { type: Number, required: true, default: 0 },
     notes: { type: String, default: '', trim: true },
   },
   { timestamps: true }
