@@ -63,7 +63,7 @@ export default function BottleDepositView() {
   // Form states
   const [formData, setFormData] = useState({
     customerId: '',
-    bottlesDeposited: 1,
+    bottlesDeposited: '' as number | string,
     securityAmount: '',
     depositDate: new Date().toISOString().split('T')[0],
     notes: '',
@@ -151,7 +151,7 @@ export default function BottleDepositView() {
       setShowAddModal(false);
       setFormData({
         customerId: '',
-        bottlesDeposited: 1,
+        bottlesDeposited: '',
         securityAmount: '',
         depositDate: new Date().toISOString().split('T')[0],
         notes: '',
@@ -563,8 +563,9 @@ export default function BottleDepositView() {
                       type="number"
                       min="1"
                       required
+                      placeholder="0"
                       value={formData.bottlesDeposited}
-                      onChange={(e) => setFormData({ ...formData, bottlesDeposited: Math.max(Number(e.target.value) || 1, 1) })}
+                      onChange={(e) => setFormData({ ...formData, bottlesDeposited: e.target.value })}
                       className="form-input"
                       style={{ fontWeight: 800, fontSize: '1.05rem' }}
                     />

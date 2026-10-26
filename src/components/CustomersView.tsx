@@ -54,7 +54,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
   const [quickDeliveryCust, setQuickDeliveryCust] = useState<CustomerData | null>(null);
   const [deliveryData, setDeliveryData] = useState({
     date: new Date().toISOString().split('T')[0],
-    bottlesDelivered: 1 as number | string,
+    bottlesDelivered: '' as number | string,
     paymentReceived: '' as number | string,
   });
   const [savingDelivery, setSavingDelivery] = useState(false);
@@ -83,7 +83,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     area: '',
     ratePerBottle: defaultPlantRate || 100,
     initialBalance: 0,
-    depositBottles: 1,
+    depositBottles: 0,
     securityAmount: '' as number | string,
     notes: '',
   });
@@ -186,6 +186,12 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     setSavingDelivery(true);
     try {
       const bottlesQty = Number(deliveryData.bottlesDelivered) || 0;
+      if (bottlesQty <= 0) {
+        toast.error('Please enter bottles delivered (at least 1)');
+        setSavingDelivery(false);
+        savingDeliveryRef.current = false;
+        return;
+      }
       const paymentRecvd = Number(deliveryData.paymentReceived) || 0;
       const res = await fetch('/api/deliveries', {
         method: 'POST',
@@ -211,7 +217,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       setQuickDeliveryCust(null);
       setDeliveryData({
         date: new Date().toISOString().split('T')[0],
-        bottlesDelivered: 1,
+        bottlesDelivered: '',
         paymentReceived: '',
       });
       fetchCustomers();
@@ -512,7 +518,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                       setQuickDeliveryCust(cust);
                       setDeliveryData({
                         date: new Date().toISOString().split('T')[0],
-                        bottlesDelivered: 1,
+                        bottlesDelivered: '',
                         paymentReceived: '',
                       });
                     }}
@@ -599,12 +605,12 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     type="number"
                     min="1"
                     required
-                    placeholder="1"
-                    value={deliveryData.bottlesDelivered === 0 ? '' : deliveryData.bottlesDelivered}
+                    placeholder="0"
+                    value={deliveryData.bottlesDelivered}
                     onChange={(e) =>
                       setDeliveryData({
                         ...deliveryData,
-                        bottlesDelivered: e.target.value === '' ? 0 : Number(e.target.value),
+                        bottlesDelivered: e.target.value === '' ? '' : Number(e.target.value),
                       })
                     }
                     className="form-input"
@@ -841,7 +847,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     <input
                       type="number"
                       min="0"
-                      placeholder="1"
+                      placeholder="0"
                       value={formData.depositBottles === 0 ? '' : formData.depositBottles}
                       onChange={(e) =>
                         setFormData({
