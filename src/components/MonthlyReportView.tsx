@@ -111,16 +111,30 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     if (!reportData) return;
     const phone = reportData.customer.phone?.replace(/[^0-9]/g, '');
     const currency = reportData.plant.currency || 'Rs.';
+    const isAdv = reportData.closingBalance < 0;
+    const isDue = reportData.closingBalance > 0;
+    const absClosing = Math.abs(reportData.closingBalance).toLocaleString();
+    const closingSummary = isAdv
+      ? `*CUSTOMER ADVANCE (پیشگی جمع): +${currency} ${absClosing}*`
+      : isDue
+      ? `*TOTAL DUE (بقایا واجب الادا): ${currency} ${absClosing}*`
+      : `*BALANCE: ${currency} 0 (ALL CLEAR)*`;
+
+    const openSummary =
+      reportData.openingBalance < 0
+        ? `+${currency} ${Math.abs(reportData.openingBalance).toLocaleString()} (Advance)`
+        : `${currency} ${reportData.openingBalance.toLocaleString()}`;
+
     const text =
       `*Water Delivery Bill - ${reportData.plant.name}*\n` +
       `Dear ${reportData.customer.name},\n` +
       `Monthly bill for *${reportData.month}*:\n\n` +
-      `• Previous Balance: ${currency} ${reportData.openingBalance.toLocaleString()}\n` +
+      `• Previous Balance: ${openSummary}\n` +
       `• Bottles Delivered: ${reportData.monthBottlesDelivered}\n` +
       `• Month Charges: ${currency} ${reportData.monthBilling.toLocaleString()}\n` +
       `• Payments Received: ${currency} ${reportData.monthPaymentsTotal.toLocaleString()}\n` +
       `---------------------------------\n` +
-      `*TOTAL DUE: ${currency} ${reportData.closingBalance.toLocaleString()}*\n\n` +
+      `${closingSummary}\n\n` +
       `Thank you!`;
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
@@ -135,11 +149,12 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     let running = reportData.openingBalance || 0;
 
     // 1. Opening Balance Row
+    const isOpeningAdv = running < 0;
     rows.push({
       id: 'opening-bal',
       date: `${reportData.month}-01`,
       type: 'opening',
-      description: 'Opening Balance (سابقہ بقایا)',
+      description: isOpeningAdv ? 'Opening Balance (سابقہ پیشگی جمع)' : 'Opening Balance (سابقہ بقایا)',
       bottles: '-',
       charges: '-',
       payment: '-',
@@ -292,9 +307,13 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
 
           {/* 4 Summary Cards — 2x2 grid always */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 18 }}>
-            <div style={{ background: '#f1f5f9', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Opening Balance</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 3 }}>Rs.{reportData.openingBalance.toLocaleString()}</div>
+            <div style={{ background: reportData.openingBalance < 0 ? '#ecfdf5' : '#f1f5f9', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${reportData.openingBalance < 0 ? '#a7f3d0' : '#e2e8f0'}` }}>
+              <div style={{ fontSize: '0.72rem', color: reportData.openingBalance < 0 ? '#047857' : 'var(--text-muted)', fontWeight: 600 }}>
+                {reportData.openingBalance < 0 ? 'Opening Advance (پیشگی)' : 'Opening Balance (سابقہ بقایا)'}
+              </div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: reportData.openingBalance < 0 ? '#047857' : 'inherit', marginTop: 3 }}>
+                {reportData.openingBalance < 0 ? `+ Rs. ${Math.abs(reportData.openingBalance).toLocaleString()}` : `Rs. ${reportData.openingBalance.toLocaleString()}`}
+              </div>
             </div>
             <div style={{ background: '#eff6ff', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
               <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>Month Deliveries ({reportData.monthBottlesDelivered} Bottles)</div>
@@ -304,10 +323,28 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>Payments Received</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>Rs.{reportData.monthPaymentsTotal.toLocaleString()}</div>
             </div>
-            <div style={{ background: '#fef2f2', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fecaca' }}>
-              <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Closing Balance Due</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: 3 }}>Rs.{reportData.closingBalance.toLocaleString()}</div>
-            </div>
+            {reportData.closingBalance < 0 ? (
+              <div style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
+                <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>Customer Advance (پیشگی / جمع)</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>
+                  + Rs. {Math.abs(reportData.closingBalance).toLocaleString()}
+                </div>
+              </div>
+            ) : reportData.closingBalance > 0 ? (
+              <div style={{ background: '#fef2f2', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Closing Balance Due (بقایا واجب الادا)</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: 3 }}>
+                  Rs. {reportData.closingBalance.toLocaleString()}
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Closing Balance</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: 3 }}>
+                  Rs. 0 (Clear)
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Professional ERP Customer Account Ledger Table */}
@@ -333,8 +370,8 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700 }}>{r.date}</span>
-                    <span style={{ fontWeight: 800, color: r.balance > 0 ? '#b91c1c' : 'var(--success)' }}>
-                      Bal: Rs.{r.balance.toLocaleString()}
+                    <span style={{ fontWeight: 800, color: r.balance < 0 ? 'var(--success)' : r.balance > 0 ? '#b91c1c' : 'inherit' }}>
+                      Bal: {r.balance < 0 ? `+ Rs. ${Math.abs(r.balance).toLocaleString()} (Adv)` : r.balance > 0 ? `Rs. ${r.balance.toLocaleString()} (Due)` : 'Rs. 0'}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -348,8 +385,14 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', fontWeight: 800, fontSize: '0.9rem' }}>
-                <span>Closing Balance Due:</span>
-                <span style={{ color: '#b91c1c' }}>Rs. {reportData.closingBalance.toLocaleString()}</span>
+                <span>{reportData.closingBalance < 0 ? 'Customer Advance (جمع):' : 'Closing Balance Due:'}</span>
+                <span style={{ color: reportData.closingBalance < 0 ? 'var(--success)' : reportData.closingBalance > 0 ? '#b91c1c' : 'inherit' }}>
+                  {reportData.closingBalance < 0
+                    ? `+ Rs. ${Math.abs(reportData.closingBalance).toLocaleString()} (Advance)`
+                    : reportData.closingBalance > 0
+                    ? `Rs. ${reportData.closingBalance.toLocaleString()} (Due)`
+                    : 'Rs. 0 (Clear)'}
+                </span>
               </div>
             </div>
 
@@ -361,8 +404,8 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                     <th style={{ padding: '10px 12px' }}>Date</th>
                     <th style={{ padding: '10px 12px' }}>Particulars / Description</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Bottles</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Charges / Deliveries (+)</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Payment Received (-)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Charges / Deliveries</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Payment Received</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>Running Balance</th>
                   </tr>
                 </thead>
@@ -388,13 +431,19 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: r.payment !== '-' ? 'var(--success)' : 'inherit' }}>
                         {r.payment !== '-' ? `Rs. ${Number(r.payment).toLocaleString()}` : '-'}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: r.balance > 0 ? '#b91c1c' : 'var(--success)' }}>
-                        Rs. {r.balance.toLocaleString()}
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: r.balance < 0 ? 'var(--success)' : r.balance > 0 ? '#b91c1c' : 'inherit' }}>
+                        {r.balance < 0
+                          ? `+ Rs. ${Math.abs(r.balance).toLocaleString()} (Adv)`
+                          : r.balance > 0
+                          ? `Rs. ${r.balance.toLocaleString()} (Due)`
+                          : 'Rs. 0'}
                       </td>
                     </tr>
                   ))}
                   <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
-                    <td style={{ padding: '12px' }} colSpan={2}>TOTALS / CLOSING BALANCE</td>
+                    <td style={{ padding: '12px' }} colSpan={2}>
+                      {reportData.closingBalance < 0 ? 'TOTALS / CLOSING ADVANCE (پیشگی جمع)' : 'TOTALS / CLOSING BALANCE'}
+                    </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>{reportData.monthBottlesDelivered} Bottles</td>
                     <td style={{ padding: '12px', textAlign: 'right', color: 'var(--primary)' }}>
                       Rs. {reportData.monthBilling.toLocaleString()}
@@ -402,8 +451,12 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                     <td style={{ padding: '12px', textAlign: 'right', color: 'var(--success)' }}>
                       Rs. {reportData.monthPaymentsTotal.toLocaleString()}
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'right', color: '#b91c1c', fontSize: '0.98rem' }}>
-                      Rs. {reportData.closingBalance.toLocaleString()}
+                    <td style={{ padding: '12px', textAlign: 'right', color: reportData.closingBalance < 0 ? 'var(--success)' : reportData.closingBalance > 0 ? '#b91c1c' : 'inherit', fontSize: '0.98rem' }}>
+                      {reportData.closingBalance < 0
+                        ? `+ Rs. ${Math.abs(reportData.closingBalance).toLocaleString()} (Advance)`
+                        : reportData.closingBalance > 0
+                        ? `Rs. ${reportData.closingBalance.toLocaleString()} (Due)`
+                        : 'Rs. 0 (Clear)'}
                     </td>
                   </tr>
                 </tbody>

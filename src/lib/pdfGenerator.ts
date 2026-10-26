@@ -129,11 +129,38 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
   // ── 4 Summary Cards ──
   currentY = 65;
   const cardWidth = (pageWidth - 28 - 9) / 4;
+  const isCloseAdv = data.closingBalance < 0;
+  const isOpenAdv = data.openingBalance < 0;
+
   const cards = [
-    { title: 'Previous Balance', value: `${currency} ${data.openingBalance.toLocaleString()}`, color: [241, 245, 249] as [number,number,number], textCol: [71, 85, 105] as [number,number,number] },
-    { title: 'This Month Bill', value: `${currency} ${data.monthBilling.toLocaleString()}`, color: [238, 242, 255] as [number,number,number], textCol: [79, 70, 229] as [number,number,number] },
-    { title: 'Payments Received', value: `${currency} ${data.monthPaymentsTotal.toLocaleString()}`, color: [236, 253, 245] as [number,number,number], textCol: [5, 150, 105] as [number,number,number] },
-    { title: 'Total Due', value: `${currency} ${data.closingBalance.toLocaleString()}`, color: [254, 242, 242] as [number,number,number], textCol: [220, 38, 38] as [number,number,number] },
+    {
+      title: isOpenAdv ? 'Prev Advance' : 'Previous Balance',
+      value: isOpenAdv
+        ? `+ ${currency} ${Math.abs(data.openingBalance).toLocaleString()}`
+        : `${currency} ${data.openingBalance.toLocaleString()}`,
+      color: [241, 245, 249] as [number, number, number],
+      textCol: (isOpenAdv ? [5, 150, 105] : [71, 85, 105]) as [number, number, number],
+    },
+    {
+      title: 'This Month Bill',
+      value: `${currency} ${data.monthBilling.toLocaleString()}`,
+      color: [238, 242, 255] as [number, number, number],
+      textCol: [79, 70, 229] as [number, number, number],
+    },
+    {
+      title: 'Payments Received',
+      value: `${currency} ${data.monthPaymentsTotal.toLocaleString()}`,
+      color: [236, 253, 245] as [number, number, number],
+      textCol: [5, 150, 105] as [number, number, number],
+    },
+    {
+      title: isCloseAdv ? 'Customer Advance' : data.closingBalance > 0 ? 'Total Due' : 'Balance Clear',
+      value: isCloseAdv
+        ? `+ ${currency} ${Math.abs(data.closingBalance).toLocaleString()}`
+        : `${currency} ${data.closingBalance.toLocaleString()}`,
+      color: (isCloseAdv ? [236, 253, 245] : data.closingBalance > 0 ? [254, 242, 242] : [248, 250, 252]) as [number, number, number],
+      textCol: (isCloseAdv ? [5, 150, 105] : data.closingBalance > 0 ? [220, 38, 38] : [51, 65, 85]) as [number, number, number],
+    },
   ];
   cards.forEach((card, idx) => {
     const cardX = 14 + idx * (cardWidth + 3);
@@ -150,7 +177,6 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
     doc.text(card.value, cardX + cardWidth / 2, currentY + 13, { align: 'center' });
   });
 
-  // ── Daily Ledger Table (delivery only — no returned column) ──
   // ── ERP Customer Ledger Table with Running Balance ──
   currentY = 89;
 
@@ -189,14 +215,20 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
   const tableRows: (string | number)[][] = [];
   let runningBal = data.openingBalance || 0;
 
+  const formatBalText = (bal: number) => {
+    if (bal < 0) return `+ ${currency} ${Math.abs(bal).toLocaleString()} (Adv)`;
+    if (bal > 0) return `${currency} ${bal.toLocaleString()} (Due)`;
+    return `${currency} 0`;
+  };
+
   // 1. Opening Balance Row
   tableRows.push([
     `${data.month}-01`,
-    'Opening Balance (سابقہ بقایا)',
+    runningBal < 0 ? 'Opening Balance (پیشگی جمع)' : 'Opening Balance (سابقہ بقایا)',
     '-',
     '-',
     '-',
-    `${currency} ${runningBal.toLocaleString()}`,
+    formatBalText(runningBal),
   ]);
 
   events.forEach((ev) => {
@@ -211,7 +243,7 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
         ev.bottles,
         `${currency} ${ev.amount.toLocaleString()}`,
         '-',
-        `${currency} ${runningBal.toLocaleString()}`,
+        formatBalText(runningBal),
       ]);
     } else {
       runningBal -= ev.amount;
@@ -221,24 +253,24 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
         '-',
         '-',
         `${currency} ${ev.amount.toLocaleString()}`,
-        `${currency} ${runningBal.toLocaleString()}`,
+        formatBalText(runningBal),
       ]);
     }
   });
 
   // Total Summary Row
   tableRows.push([
-    'CLOSING BALANCE',
+    isCloseAdv ? 'CLOSING ADVANCE' : 'CLOSING BALANCE',
     'Total Month Activity',
     data.monthBottlesDelivered,
     `${currency} ${data.monthBilling.toLocaleString()}`,
     `${currency} ${data.monthPaymentsTotal.toLocaleString()}`,
-    `${currency} ${data.closingBalance.toLocaleString()}`,
+    formatBalText(data.closingBalance),
   ]);
 
   autoTable(doc, {
     startY: currentY,
-    head: [['Date', 'Particulars / Description', 'Bottles', 'Charges (+)', 'Paid (-)', 'Balance']],
+    head: [['Date', 'Particulars / Description', 'Bottles', 'Charges', 'Paid', 'Balance']],
     body: tableRows,
     theme: 'striped',
     headStyles: { fillColor: BRAND_COLOR, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
@@ -249,7 +281,7 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
       2: { halign: 'center', cellWidth: 16 },
       3: { halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42], cellWidth: 26 },
       4: { halign: 'right', fontStyle: 'bold', textColor: [5, 150, 105], cellWidth: 26 },
-      5: { halign: 'right', fontStyle: 'bold', textColor: [3, 105, 161], cellWidth: 28 },
+      5: { halign: 'right', fontStyle: 'bold', textColor: [3, 105, 161], cellWidth: 32 },
     },
     didParseCell: (hookData) => {
       // Opening balance row styling
@@ -259,9 +291,9 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
       }
       // Closing balance total row styling
       if (hookData.row.index === tableRows.length - 1) {
-        hookData.cell.styles.fillColor = [238, 242, 255];
+        hookData.cell.styles.fillColor = isCloseAdv ? [236, 253, 245] : [238, 242, 255];
         hookData.cell.styles.fontStyle = 'bold';
-        hookData.cell.styles.textColor = [15, 23, 42];
+        hookData.cell.styles.textColor = isCloseAdv ? [5, 150, 105] : [15, 23, 42];
       }
     },
     margin: { left: 14, right: 14 },
@@ -272,13 +304,29 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
   let finalY = lastY + 8;
   if (finalY > 250) { doc.addPage(); finalY = 20; }
 
-  // ── Total Due Box ──
-  doc.setFillColor(15, 23, 42);
-  doc.roundedRect(14, finalY, pageWidth - 28, 14, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(`TOTAL BALANCE DUE: ${currency} ${data.closingBalance.toLocaleString()}`, pageWidth / 2, finalY + 9, { align: 'center' });
+  // ── Total Balance Box ──
+  if (isCloseAdv) {
+    doc.setFillColor(5, 150, 105);
+    doc.roundedRect(14, finalY, pageWidth - 28, 14, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`CUSTOMER ADVANCE BALANCE: + ${currency} ${Math.abs(data.closingBalance).toLocaleString()}`, pageWidth / 2, finalY + 9, { align: 'center' });
+  } else if (data.closingBalance > 0) {
+    doc.setFillColor(185, 28, 28);
+    doc.roundedRect(14, finalY, pageWidth - 28, 14, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`TOTAL BALANCE DUE: ${currency} ${data.closingBalance.toLocaleString()}`, pageWidth / 2, finalY + 9, { align: 'center' });
+  } else {
+    doc.setFillColor(71, 85, 105);
+    doc.roundedRect(14, finalY, pageWidth - 28, 14, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`TOTAL BALANCE: ${currency} 0 (ALL CLEARED)`, pageWidth / 2, finalY + 9, { align: 'center' });
+  }
 
   // ── Footer note ──
   finalY += 22;

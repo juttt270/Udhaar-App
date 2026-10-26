@@ -117,10 +117,14 @@ export default function CustomerDropdown({
                     marginLeft: 8,
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    color: selected.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
+                    color: selected.currentBalance > 0 ? 'var(--danger)' : selected.currentBalance < 0 ? 'var(--success)' : 'var(--text-muted)',
                   }}
                 >
-                  Due: Rs.{selected.currentBalance.toLocaleString()}
+                  {selected.currentBalance > 0
+                    ? `Due: Rs.${selected.currentBalance.toLocaleString()}`
+                    : selected.currentBalance < 0
+                    ? `Adv: +Rs.${Math.abs(selected.currentBalance).toLocaleString()}`
+                    : 'Clear'}
                 </span>
               )}
             </>
@@ -259,12 +263,16 @@ export default function CustomerDropdown({
                         style={{
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          color: c.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
+                          color: c.currentBalance > 0 ? 'var(--danger)' : c.currentBalance < 0 ? 'var(--success)' : 'var(--text-muted)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
                       >
-                        Rs.{c.currentBalance.toLocaleString()}
+                        {c.currentBalance > 0
+                          ? `Due: Rs.${c.currentBalance.toLocaleString()}`
+                          : c.currentBalance < 0
+                          ? `Adv: +Rs.${Math.abs(c.currentBalance).toLocaleString()}`
+                          : 'Clear'}
                       </span>
                     )}
                   </button>
