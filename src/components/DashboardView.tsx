@@ -137,12 +137,12 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <h1 style={{ fontSize: '1.5rem', marginTop: 6, color: '#ffffff' }}>
             {plantName || 'AB Water Filter Dashboard'}
           </h1>
-          <p style={{ fontSize: '0.86rem', opacity: 0.9, marginTop: 2 }}>
+          <p className="desktop-only" style={{ fontSize: '0.86rem', opacity: 0.9, marginTop: 2 }}>
             Manage daily deliveries, customer accounts, and monthly bills easily.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="desktop-flex" style={{ gap: 10, flexWrap: 'wrap' }}>
           <button
             onClick={() => onNavigate('daily')}
             className="btn"
@@ -173,20 +173,20 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
       <div
         className="card"
         style={{
-          marginBottom: 18,
+          marginBottom: 14,
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
-          padding: '12px 16px',
+          gap: 10,
+          padding: '10px 14px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="desktop-flex" style={{ alignItems: 'center', gap: 10 }}>
           <div
             style={{
-              width: 34,
-              height: 34,
+              width: 32,
+              height: 32,
               borderRadius: 'var(--radius-sm)',
               background: 'var(--primary-light)',
               color: 'var(--primary)',
@@ -195,10 +195,10 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
               justifyContent: 'center',
             }}
           >
-            <TrendingUp size={18} />
+            <TrendingUp size={16} />
           </div>
           <div>
-            <div style={{ fontSize: '0.92rem', fontWeight: 700 }}>Data Filter / دورانیہ</div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Data Filter</div>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
               {selectedPeriod === 'today'
                 ? "Showing figures for Today"
@@ -207,20 +207,20 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 200px', width: '100%' }}>
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="form-select"
             style={{
               fontWeight: 700,
-              fontSize: '0.9rem',
-              padding: '8px 14px',
-              minWidth: 200,
+              fontSize: '0.88rem',
+              padding: '6px 12px',
+              width: '100%',
               borderColor: 'var(--primary)',
             }}
           >
-            <option value="today">📅 Today (آج کا ڈیٹا)</option>
+            <option value="today">📅 Today</option>
             {stats?.availableMonths && stats.availableMonths.length > 0 ? (
               stats.availableMonths.map((m) => (
                 <option key={m} value={m}>

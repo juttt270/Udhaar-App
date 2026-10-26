@@ -224,7 +224,7 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
   // 1. Opening Balance Row
   tableRows.push([
     `${data.month}-01`,
-    runningBal < 0 ? 'Opening Balance (پیشگی جمع)' : 'Opening Balance (سابقہ بقایا)',
+    runningBal < 0 ? 'Opening Balance (Advance)' : 'Opening Balance',
     '-',
     '-',
     '-',
@@ -273,8 +273,14 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
     head: [['Date', 'Particulars / Description', 'Bottles', 'Charges', 'Paid', 'Balance']],
     body: tableRows,
     theme: 'striped',
-    headStyles: { fillColor: BRAND_COLOR, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
-    styles: { fontSize: 7.8, cellPadding: 2, halign: 'center', textColor: [30, 41, 59] },
+    headStyles: {
+      fillColor: [2, 132, 199],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      halign: 'center',
+    },
+    styles: { fontSize: 7.8, cellPadding: 2.5, halign: 'center', textColor: [30, 41, 59] },
     columnStyles: {
       0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
       1: { halign: 'left', cellWidth: 'auto' },
@@ -284,10 +290,14 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
       5: { halign: 'right', fontStyle: 'bold', textColor: [3, 105, 161], cellWidth: 32 },
     },
     didParseCell: (hookData) => {
+      // ONLY style body rows, do not overwrite header cell styles!
+      if (hookData.section !== 'body') return;
+
       // Opening balance row styling
       if (hookData.row.index === 0) {
         hookData.cell.styles.fillColor = [241, 245, 249];
         hookData.cell.styles.fontStyle = 'bold';
+        hookData.cell.styles.textColor = [15, 23, 42];
       }
       // Closing balance total row styling
       if (hookData.row.index === tableRows.length - 1) {

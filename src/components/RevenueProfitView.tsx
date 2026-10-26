@@ -397,7 +397,7 @@ export default function RevenueProfitView() {
           <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
             <TrendingUp size={24} color="var(--primary)" /> Revenue &amp; Profit Ledger
           </h2>
-          <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+          <p className="desktop-only" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
             Wholesale bottle cost, total billed revenue, plant expenses, and net profit
           </p>
         </div>
@@ -532,7 +532,7 @@ export default function RevenueProfitView() {
               gap: 6,
             }}
           >
-            <BarChart3 size={16} /> Monthly Record (ماہانہ رپورٹ)
+            <BarChart3 size={16} /> Monthly Record
           </button>
         </div>
 

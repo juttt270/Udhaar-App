@@ -115,9 +115,9 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     const isDue = reportData.closingBalance > 0;
     const absClosing = Math.abs(reportData.closingBalance).toLocaleString();
     const closingSummary = isAdv
-      ? `*CUSTOMER ADVANCE (پیشگی جمع): +${currency} ${absClosing}*`
+      ? `*CUSTOMER ADVANCE: +${currency} ${absClosing}*`
       : isDue
-      ? `*TOTAL DUE (بقایا واجب الادا): ${currency} ${absClosing}*`
+      ? `*TOTAL DUE: ${currency} ${absClosing}*`
       : `*BALANCE: ${currency} 0 (ALL CLEAR)*`;
 
     const openSummary =
@@ -154,7 +154,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
       id: 'opening-bal',
       date: `${reportData.month}-01`,
       type: 'opening',
-      description: isOpeningAdv ? 'Opening Balance (سابقہ پیشگی جمع)' : 'Opening Balance (سابقہ بقایا)',
+      description: isOpeningAdv ? 'Opening Balance (Advance)' : 'Opening Balance',
       bottles: '-',
       charges: '-',
       payment: '-',
@@ -215,7 +215,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
         <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: 8 }}>
           <FileText size={22} color="var(--primary)" /> Monthly Bill &amp; ERP Ledger
         </h2>
-        <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+        <p className="desktop-only" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
           Detailed customer ledger statement with opening &amp; closing balance and running tally
         </p>
       </div>
@@ -284,7 +284,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           </div>
 
           {/* Customer Details */}
-          <div style={{ background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
+          <div className="report-customer-info">
             <div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Customer</div>
               <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{reportData.customer.name}</div>
@@ -297,50 +297,50 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Rate</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Rate &amp; Bottles</div>
               <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Rs.{reportData.customer.ratePerBottle}/bottle</div>
               <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>
-                Bottles Held: {reportData.totalBottlesWithCustomer}
+                Held: {reportData.totalBottlesWithCustomer} bottles
               </div>
             </div>
           </div>
 
-          {/* 4 Summary Cards — 2x2 grid always */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 18 }}>
-            <div style={{ background: reportData.openingBalance < 0 ? '#ecfdf5' : '#f1f5f9', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${reportData.openingBalance < 0 ? '#a7f3d0' : '#e2e8f0'}` }}>
+          {/* 4 Summary Cards — 2x2 grid */}
+          <div className="report-summary-grid">
+            <div className="report-summary-card" style={{ background: reportData.openingBalance < 0 ? '#ecfdf5' : '#f1f5f9', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${reportData.openingBalance < 0 ? '#a7f3d0' : '#e2e8f0'}` }}>
               <div style={{ fontSize: '0.72rem', color: reportData.openingBalance < 0 ? '#047857' : 'var(--text-muted)', fontWeight: 600 }}>
-                {reportData.openingBalance < 0 ? 'Opening Advance (پیشگی)' : 'Opening Balance (سابقہ بقایا)'}
+                {reportData.openingBalance < 0 ? 'Opening Advance' : 'Opening Balance'}
               </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: reportData.openingBalance < 0 ? '#047857' : 'inherit', marginTop: 3 }}>
+              <div className="stat-val" style={{ fontSize: '1.1rem', fontWeight: 800, color: reportData.openingBalance < 0 ? '#047857' : 'inherit', marginTop: 3 }}>
                 {reportData.openingBalance < 0 ? `+ Rs. ${Math.abs(reportData.openingBalance).toLocaleString()}` : `Rs. ${reportData.openingBalance.toLocaleString()}`}
               </div>
             </div>
-            <div style={{ background: '#eff6ff', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>Month Deliveries ({reportData.monthBottlesDelivered} Bottles)</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d4ed8', marginTop: 3 }}>Rs.{reportData.monthBilling.toLocaleString()}</div>
+            <div className="report-summary-card" style={{ background: '#eff6ff', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
+              <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>Month Deliveries ({reportData.monthBottlesDelivered} Btls)</div>
+              <div className="stat-val" style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d4ed8', marginTop: 3 }}>Rs.{reportData.monthBilling.toLocaleString()}</div>
             </div>
-            <div style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
+            <div className="report-summary-card" style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
               <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>Payments Received</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>Rs.{reportData.monthPaymentsTotal.toLocaleString()}</div>
+              <div className="stat-val" style={{ fontSize: '1.1rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>Rs.{reportData.monthPaymentsTotal.toLocaleString()}</div>
             </div>
             {reportData.closingBalance < 0 ? (
-              <div style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
-                <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>Customer Advance (پیشگی / جمع)</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>
+              <div className="report-summary-card" style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
+                <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>Customer Advance</div>
+                <div className="stat-val" style={{ fontSize: '1.2rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>
                   + Rs. {Math.abs(reportData.closingBalance).toLocaleString()}
                 </div>
               </div>
             ) : reportData.closingBalance > 0 ? (
-              <div style={{ background: '#fef2f2', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fecaca' }}>
-                <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Closing Balance Due (بقایا واجب الادا)</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: 3 }}>
+              <div className="report-summary-card" style={{ background: '#fef2f2', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Closing Balance Due</div>
+                <div className="stat-val" style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: 3 }}>
                   Rs. {reportData.closingBalance.toLocaleString()}
                 </div>
               </div>
             ) : (
-              <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
+              <div className="report-summary-card" style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Closing Balance</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: 3 }}>
+                <div className="stat-val" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: 3 }}>
                   Rs. 0 (Clear)
                 </div>
               </div>
@@ -385,7 +385,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', fontWeight: 800, fontSize: '0.9rem' }}>
-                <span>{reportData.closingBalance < 0 ? 'Customer Advance (جمع):' : 'Closing Balance Due:'}</span>
+                <span>{reportData.closingBalance < 0 ? 'Customer Advance:' : 'Closing Balance Due:'}</span>
                 <span style={{ color: reportData.closingBalance < 0 ? 'var(--success)' : reportData.closingBalance > 0 ? '#b91c1c' : 'inherit' }}>
                   {reportData.closingBalance < 0
                     ? `+ Rs. ${Math.abs(reportData.closingBalance).toLocaleString()} (Advance)`
@@ -442,7 +442,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
                   ))}
                   <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
                     <td style={{ padding: '12px' }} colSpan={2}>
-                      {reportData.closingBalance < 0 ? 'TOTALS / CLOSING ADVANCE (پیشگی جمع)' : 'TOTALS / CLOSING BALANCE'}
+                      {reportData.closingBalance < 0 ? 'TOTALS / CLOSING ADVANCE' : 'TOTALS / CLOSING BALANCE'}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>{reportData.monthBottlesDelivered} Bottles</td>
                     <td style={{ padding: '12px', textAlign: 'right', color: 'var(--primary)' }}>
@@ -466,7 +466,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
 
           {/* Download Footer */}
           <div style={{ paddingTop: 14, borderTop: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            <div className="desktop-only" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Save as PDF or send to WhatsApp.
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

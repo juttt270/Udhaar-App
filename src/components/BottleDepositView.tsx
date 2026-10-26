@@ -252,10 +252,10 @@ export default function BottleDepositView() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
         <div>
-          <h2 style={{ fontSize: '1.35rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck size={24} color="var(--primary)" /> Bottle Security Deposit / Amanat
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={22} color="var(--primary)" /> Bottle Security Deposits
           </h2>
-          <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+          <p className="desktop-only" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
             Track security cash held against water bottles given to customers
           </p>
         </div>
@@ -327,11 +327,12 @@ export default function BottleDepositView() {
         </div>
 
         {/* Status Filter Tabs */}
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setStatusFilter('active')}
             className={`btn btn-sm ${statusFilter === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '4px 8px', fontSize: '0.78rem' }}
           >
             Active ({stats.activeCount})
           </button>
@@ -339,6 +340,7 @@ export default function BottleDepositView() {
             type="button"
             onClick={() => setStatusFilter('refunded')}
             className={`btn btn-sm ${statusFilter === 'refunded' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '4px 8px', fontSize: '0.78rem' }}
           >
             Refunded ({stats.refundedCount})
           </button>
@@ -346,6 +348,7 @@ export default function BottleDepositView() {
             type="button"
             onClick={() => setStatusFilter('all')}
             className={`btn btn-sm ${statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '4px 8px', fontSize: '0.78rem' }}
           >
             All ({stats.totalRecords})
           </button>

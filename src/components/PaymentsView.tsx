@@ -301,25 +301,29 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 12,
-          marginBottom: 16,
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 10,
+          marginBottom: 14,
         }}
       >
-        <div className="card" style={{ padding: '12px 16px', borderLeft: '4px solid var(--success)' }}>
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COLLECTED</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 2 }}>
+        <div className="card" style={{ padding: '8px 12px', borderLeft: '4px solid var(--success)' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COLLECTED</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)', marginTop: 2 }}>
             Rs. {totalAllPaymentsAmount.toLocaleString()}
           </div>
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{payments.length} payment transactions</div>
+          <div className="desktop-only" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+            {payments.length} payment transactions
+          </div>
         </div>
 
-        <div className="card" style={{ padding: '12px 16px', borderLeft: '4px solid var(--primary)' }}>
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>PAYING CUSTOMERS</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--primary)', marginTop: 2 }}>
+        <div className="card" style={{ padding: '8px 12px', borderLeft: '4px solid var(--primary)' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>PAYING ACCOUNTS</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', marginTop: 2 }}>
             {customerPaymentGroups.length} Accounts
           </div>
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Grouped in accordion view</div>
+          <div className="desktop-only" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+            Grouped in accordion view
+          </div>
         </div>
       </div>
 
@@ -327,30 +331,30 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
       <div
         className="card"
         style={{
-          marginBottom: 16,
+          marginBottom: 14,
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
-          padding: '10px 14px',
+          gap: 10,
+          padding: '8px 12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 220px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 200px' }}>
           <Search size={16} color="var(--text-muted)" />
           <input
             type="text"
-            placeholder="Search customer name, area, phone..."
+            placeholder="Search customer, area, phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="form-input"
-            style={{ flex: 1, padding: '7px 10px', fontSize: '0.86rem' }}
+            style={{ flex: 1, padding: '6px 10px', fontSize: '0.84rem' }}
           />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {viewMode === 'accordion' && (
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div className="desktop-flex" style={{ gap: 6 }}>
               <button onClick={expandAll} className="btn btn-secondary btn-sm" style={{ fontSize: '0.76rem' }}>
                 Expand All
               </button>
