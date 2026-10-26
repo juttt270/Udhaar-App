@@ -479,11 +479,15 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                       </div>
                     </div>
 
-                    {cust.currentBalance !== undefined && cust.currentBalance > 0 && (
+                    {cust.currentBalance !== undefined && cust.currentBalance > 0 ? (
                       <span className="badge badge-danger" style={{ fontSize: '0.78rem' }}>
                         Due: Rs.{cust.currentBalance.toLocaleString()}
                       </span>
-                    )}
+                    ) : cust.currentBalance !== undefined && cust.currentBalance < 0 ? (
+                      <span className="badge badge-success" style={{ fontSize: '0.78rem' }}>
+                        Adv: +Rs.{Math.abs(cust.currentBalance).toLocaleString()}
+                      </span>
+                    ) : null}
 
                     <div style={{ color: 'var(--text-muted)' }}>
                       {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -634,12 +638,16 @@ export default function PaymentsView({ initialCustomerId }: PaymentsViewProps) {
                     {selectedCustomer && (
                       <span
                         style={{
-                          color: selectedCustomer.currentBalance > 0 ? 'var(--danger)' : 'var(--success)',
+                          color: selectedCustomer.currentBalance > 0 ? 'var(--danger)' : selectedCustomer.currentBalance < 0 ? 'var(--success)' : 'var(--text-muted)',
                           fontWeight: 700,
                           fontSize: '0.8rem',
                         }}
                       >
-                        Unpaid Due: Rs.{selectedCustomer.currentBalance.toLocaleString()}
+                        {selectedCustomer.currentBalance > 0
+                          ? `Due: Rs.${selectedCustomer.currentBalance.toLocaleString()}`
+                          : selectedCustomer.currentBalance < 0
+                          ? `Adv: +Rs.${Math.abs(selectedCustomer.currentBalance).toLocaleString()}`
+                          : 'Clear'}
                       </span>
                     )}
                   </label>

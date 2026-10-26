@@ -229,7 +229,7 @@ export default function DailyEntryView() {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 24 }}>
           {filteredCustomers.map((cust) => {
             const entry = entries[cust._id] || { customerId: cust._id, bottlesDelivered: 0, rate: cust.ratePerBottle || 100 };
             const delivered = entry.bottlesDelivered || 0;
@@ -253,7 +253,7 @@ export default function DailyEntryView() {
                 }}
               >
                 {/* Customer info */}
-                <div style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ flex: '1 1 140px', minWidth: 120 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.97rem' }}>{cust.name}</span>
                     {delivered > 0 && (
@@ -267,8 +267,8 @@ export default function DailyEntryView() {
                   </div>
                 </div>
 
-                {/* Stepper + Amount */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                {/* Stepper + Payment + Amount */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <div>
                     <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)', marginBottom: 3 }}>
                       BOTTLES DELIVERED
@@ -322,7 +322,7 @@ export default function DailyEntryView() {
                       onChange={(e) => handlePaymentUpdate(cust._id, e.target.value)}
                       className="form-input"
                       style={{
-                        width: 105,
+                        width: 95,
                         padding: '6px 8px',
                         fontSize: '0.84rem',
                         fontWeight: 700,
@@ -331,7 +331,7 @@ export default function DailyEntryView() {
                     />
                   </div>
 
-                  <div style={{ textAlign: 'right', minWidth: 70 }}>
+                  <div style={{ textAlign: 'right', minWidth: 65 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Amount</div>
                     <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>
                       Rs.{dailyAmount.toLocaleString()}
@@ -341,6 +341,9 @@ export default function DailyEntryView() {
               </div>
             );
           })}
+
+          {/* Dedicated Spacer so the last customer card is never covered by the sticky save button or mobile nav */}
+          <div style={{ height: 100 }} aria-hidden="true" />
         </div>
       )}
 
@@ -350,10 +353,11 @@ export default function DailyEntryView() {
           style={{
             position: 'sticky',
             bottom: 74,
-            padding: '12px 0',
+            padding: '12px 16px',
             display: 'flex',
             justifyContent: 'center',
             pointerEvents: 'none',
+            zIndex: 40,
           }}
         >
           <button
@@ -362,9 +366,10 @@ export default function DailyEntryView() {
             className="btn btn-success btn-lg"
             style={{
               pointerEvents: 'auto',
-              boxShadow: '0 8px 20px rgba(16, 185, 129, 0.4)',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.45)',
               padding: '12px 28px',
               minWidth: 220,
+              maxWidth: '92%',
             }}
           >
             {saving ? 'Saving...' : <><Save size={18} /> Save Deliveries{totalDelivered > 0 ? ` (Rs.${totalAmountBilled.toLocaleString()})` : ''}</>}

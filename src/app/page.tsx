@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -37,11 +37,32 @@ interface UserData {
   defaultRate: number;
 }
 
+type TabType = 'dashboard' | 'daily' | 'customers' | 'payments' | 'deposits' | 'revenue' | 'reports' | 'settings';
+const VALID_TABS: TabType[] = ['dashboard', 'daily', 'customers', 'payments', 'deposits', 'revenue', 'reports', 'settings'];
+
+const getStoredTab = (): TabType => {
+  if (typeof window === 'undefined') return 'dashboard';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const tabQuery = params.get('tab') as TabType;
+    if (tabQuery && VALID_TABS.includes(tabQuery)) return tabQuery;
+
+    const hash = window.location.hash.replace('#', '') as TabType;
+    if (hash && VALID_TABS.includes(hash)) return hash;
+
+    const saved = localStorage.getItem('udhaar_active_tab') as TabType;
+    if (saved && VALID_TABS.includes(saved)) return saved;
+  } catch {
+    // fallback
+  }
+  return 'dashboard';
+};
+
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [hasAnyAdmin, setHasAnyAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'daily' | 'customers' | 'payments' | 'deposits' | 'revenue' | 'reports' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() => getStoredTab());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [openAddCustomer, setOpenAddCustomer] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,6 +76,30 @@ export default function HomePage() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Sync tab on mount and popstate
+  useEffect(() => {
+    const initialTab = getStoredTab();
+    if (initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== initialTab) {
+        url.searchParams.set('tab', initialTab);
+        window.history.replaceState(null, '', url.toString());
+      }
+    } catch {
+      // ignore
+    }
+
+    const handlePopState = () => {
+      const current = getStoredTab();
+      setActiveTab(current);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const checkSession = useCallback(async () => {
@@ -82,6 +127,11 @@ export default function HomePage() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setCurrentUser(null);
+      try {
+        localStorage.removeItem('udhaar_active_tab');
+      } catch {
+        // ignore
+      }
       toast.info('Signed out successfully.');
     } catch {
       toast.error('Logout error');
@@ -89,6 +139,8 @@ export default function HomePage() {
   };
 
   const navigateTo = (tab: string, extra?: unknown) => {
+    const targetTab = (VALID_TABS.includes(tab as TabType) ? tab : 'dashboard') as TabType;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (extra && (extra as any).customerId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,9 +156,18 @@ export default function HomePage() {
       setOpenAddCustomer(false);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setActiveTab(tab as any);
+    setActiveTab(targetTab);
     setMobileMenuOpen(false);
+
+    try {
+      localStorage.setItem('udhaar_active_tab', targetTab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', targetTab);
+      window.history.pushState(null, '', url.toString());
+    } catch {
+      // ignore
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

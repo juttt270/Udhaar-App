@@ -945,7 +945,7 @@ export default function RevenueProfitView() {
             <form onSubmit={handleSaveEntry}>
               <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
                 {/* Date & Plant Rate Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Date *</label>
                     <input
@@ -1002,6 +1002,8 @@ export default function RevenueProfitView() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 4,
                     }}
                   >
                     <span>Bottles Delivered &amp; Sold</span>
@@ -1009,8 +1011,8 @@ export default function RevenueProfitView() {
                       Total: {calcTotalBottles} Bottles
                     </span>
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 110px' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         Auto (Deliveries)
                       </span>
@@ -1031,7 +1033,7 @@ export default function RevenueProfitView() {
                     <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)', paddingTop: 14 }}>
                       +
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: '1 1 110px' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         Extra Bottles (Optional)
                       </span>
@@ -1066,6 +1068,8 @@ export default function RevenueProfitView() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 4,
                     }}
                   >
                     <span>Total Amount Billed (Revenue)</span>
@@ -1073,8 +1077,8 @@ export default function RevenueProfitView() {
                       Total: Rs. {calcTotalBilled.toLocaleString()}
                     </span>
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 110px' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         Auto Billed (Deliveries)
                       </span>
@@ -1095,7 +1099,7 @@ export default function RevenueProfitView() {
                     <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)', paddingTop: 14 }}>
                       +
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: '1 1 110px' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         Extra Amount (Optional)
                       </span>

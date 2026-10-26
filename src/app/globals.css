@@ -749,3 +749,29 @@ a {
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+/* Mobile Responsiveness & Overflow Prevention */
+@media (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+  }
+  .page-container {
+    padding: 12px 10px;
+  }
+  .stats-grid {
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px 10px;
+  }
+  .stat-value {
+    font-size: 1.15rem;
+  }
+  .modal-overlay {
+    padding: 8px;
+  }
+  .modal-content {
+    max-height: 94vh;
+    border-radius: var(--radius-md);
+  }
+}
