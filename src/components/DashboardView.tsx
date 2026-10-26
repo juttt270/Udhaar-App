@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -21,21 +21,17 @@ interface DashboardViewProps {
 }
 
 interface StatsData {
-  today: {
-    date: string;
-    bottlesDelivered: number;
-    bottlesReturned: number;
-    billedAmount: number;
-    cashReceived: number;
-  };
-  month: {
-    monthStr: string;
-    totalBottles: number;
-    billedAmount: number;
-    collectedAmount: number;
-  };
+  period: string;
+  selectedMonth: string;
+  bottlesDelivered: number;
+  billedAmount: number;
+  collectedAmount: number;
+  totalExpenses: number;
+  wholesaleCost: number;
+  netProfit: number;
   activeCustomersCount: number;
   totalPendingUdhaar: number;
+  availableMonths: string[];
 }
 
 interface CustomerSummary {
@@ -48,15 +44,23 @@ interface CustomerSummary {
 }
 
 export default function DashboardView({ onNavigate, plantName }: DashboardViewProps) {
+  const currentMonthStr = new Date().toISOString().substring(0, 7);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(currentMonthStr); // 'today' or 'YYYY-MM'
   const [stats, setStats] = useState<StatsData | null>(null);
   const [topDebtors, setTopDebtors] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
   const fetchStats = useCallback(async () => {
+    setLoading(true);
     try {
+      const isToday = selectedPeriod === 'today';
+      const url = isToday
+        ? '/api/stats?period=today'
+        : `/api/stats?period=month&month=${selectedPeriod}`;
+
       const [resStats, resCust] = await Promise.all([
-        fetch('/api/stats'),
+        fetch(url),
         fetch('/api/customers?status=active'),
       ]);
 
@@ -78,7 +82,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [selectedPeriod, toast]);
 
   useEffect(() => {
     fetchStats();
@@ -91,6 +95,13 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
     year: 'numeric',
   });
 
+  const getMonthLabel = (m: string) => {
+    const [y, mo] = m.split('-');
+    const dateObj = new Date(Number(y), Number(mo) - 1, 1);
+    const label = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    return m === currentMonthStr ? `${label} (Current Month)` : label;
+  };
+
   return (
     <div className="page-container">
       {/* Top Banner */}
@@ -100,7 +111,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           borderRadius: 'var(--radius-lg)',
           padding: '22px 20px',
           color: '#ffffff',
-          marginBottom: 20,
+          marginBottom: 18,
           boxShadow: '0 8px 20px rgba(2, 132, 199, 0.2)',
           display: 'flex',
           flexWrap: 'wrap',
@@ -158,44 +169,172 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
         </div>
       </div>
 
-      {/* 3 Primary KPI Cards */}
-      <div className="stats-grid">
-        <div className="stat-card">
+      {/* Period Filter Dropdown Bar */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 18,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '12px 16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--primary-light)',
+              color: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <TrendingUp size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700 }}>Data Filter / دورانیہ</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              {selectedPeriod === 'today'
+                ? "Showing figures for Today"
+                : `Showing monthly figures for ${getMonthLabel(selectedPeriod)}`}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="form-select"
+            style={{
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              padding: '8px 14px',
+              minWidth: 200,
+              borderColor: 'var(--primary)',
+            }}
+          >
+            <option value="today">📅 Today (آج کا ڈیٹا)</option>
+            {stats?.availableMonths && stats.availableMonths.length > 0 ? (
+              stats.availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  📆 {getMonthLabel(m)}
+                </option>
+              ))
+            ) : (
+              <option value={currentMonthStr}>📆 {getMonthLabel(currentMonthStr)}</option>
+            )}
+          </select>
+        </div>
+      </div>
+
+      {/* 5 KPI Cards for the Selected Period */}
+      <div className="stats-grid" style={{ marginBottom: 20 }}>
+        {/* 1. Bottles Delivered */}
+        <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-header">
-            <span>Delivered Today</span>
+            <span>{selectedPeriod === 'today' ? 'Bottles Delivered Today' : 'Bottles Delivered in Month'}</span>
             <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
               <Droplets size={18} />
             </div>
           </div>
-          <div className="stat-value">
-            {loading ? '...' : `${stats?.today?.bottlesDelivered || 0} Bottles`}
+          <div className="stat-value" style={{ color: '#0284c7' }}>
+            {loading ? '...' : `${(stats?.bottlesDelivered || 0).toLocaleString()} Bottles`}
           </div>
           <div className="stat-hint">
-            Bill: Rs. {(stats?.today?.billedAmount || 0).toLocaleString()}
+            Wholesale cost: Rs. {(stats?.wholesaleCost || 0).toLocaleString()}
           </div>
         </div>
 
-        <div className="stat-card">
+        {/* 2. Total Billed / Revenue */}
+        <div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }}>
           <div className="stat-header">
-            <span>Cash Received Today</span>
-            <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+            <span>{selectedPeriod === 'today' ? 'Billed Amount Today' : 'Total Billed (Revenue)'}</span>
+            <div className="stat-icon" style={{ background: '#eef2ff', color: '#4f46e5' }}>
               <Wallet size={18} />
             </div>
           </div>
-          <div className="stat-value" style={{ color: '#059669' }}>
-            {loading ? '...' : `Rs. ${(stats?.today?.cashReceived || 0).toLocaleString()}`}
+          <div className="stat-value" style={{ color: '#4f46e5' }}>
+            {loading ? '...' : `Rs. ${(stats?.billedAmount || 0).toLocaleString()}`}
           </div>
-          <div className="stat-hint">Total payments collected</div>
+          <div className="stat-hint">
+            {selectedPeriod === 'today' ? "Today's delivery bill" : 'Total charges billed'}
+          </div>
         </div>
 
-        <div className="stat-card">
+        {/* 3. Total Expenses */}
+        <div className="stat-card" style={{ borderLeft: '4px solid #dc2626' }}>
           <div className="stat-header">
-            <span>Total Unpaid Balance</span>
+            <span>{selectedPeriod === 'today' ? "Today's Expense" : 'Month Expenses'}</span>
             <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
               <AlertTriangle size={18} />
             </div>
           </div>
           <div className="stat-value" style={{ color: '#dc2626' }}>
+            {loading ? '...' : `Rs. ${(stats?.totalExpenses || 0).toLocaleString()}`}
+          </div>
+          <div className="stat-hint">Plant & delivery expenses</div>
+        </div>
+
+        {/* 4. Net Profit */}
+        <div
+          className="stat-card"
+          style={{
+            borderLeft: `4px solid ${(stats?.netProfit || 0) >= 0 ? '#10b981' : '#ef4444'}`,
+          }}
+        >
+          <div className="stat-header">
+            <span>{selectedPeriod === 'today' ? "Today's Profit" : 'Month Net Profit'}</span>
+            <div
+              className="stat-icon"
+              style={{
+                background: (stats?.netProfit || 0) >= 0 ? '#ecfdf5' : '#fee2e2',
+                color: (stats?.netProfit || 0) >= 0 ? '#10b981' : '#ef4444',
+              }}
+            >
+              <TrendingUp size={18} />
+            </div>
+          </div>
+          <div
+            className="stat-value"
+            style={{ color: (stats?.netProfit || 0) >= 0 ? '#059669' : '#dc2626' }}
+          >
+            {loading ? '...' : `Rs. ${(stats?.netProfit || 0).toLocaleString()}`}
+          </div>
+          <div className="stat-hint">
+            (Billed - Bottle cost - Expenses)
+          </div>
+        </div>
+
+        {/* 5. Cash Received / Collected */}
+        <div className="stat-card" style={{ borderLeft: '4px solid #059669' }}>
+          <div className="stat-header">
+            <span>{selectedPeriod === 'today' ? 'Cash Received Today' : 'Cash Collected'}</span>
+            <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+              <Wallet size={18} />
+            </div>
+          </div>
+          <div className="stat-value" style={{ color: '#059669' }}>
+            {loading ? '...' : `Rs. ${(stats?.collectedAmount || 0).toLocaleString()}`}
+          </div>
+          <div className="stat-hint">Payments collected in period</div>
+        </div>
+
+        {/* 6. Total Unpaid Balance (Overall) */}
+        <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="stat-header">
+            <span>Total Pending Udhaar</span>
+            <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+              <Users size={18} />
+            </div>
+          </div>
+          <div className="stat-value" style={{ color: '#d97706' }}>
             {loading ? '...' : `Rs. ${(stats?.totalPendingUdhaar || 0).toLocaleString()}`}
           </div>
           <div className="stat-hint">

@@ -18,6 +18,7 @@ interface DeliveryEntry {
   bottlesDelivered: number;
   rate: number;
   notes?: string;
+  paymentReceived?: number | string;
 }
 
 export default function DailyEntryView() {
@@ -50,6 +51,7 @@ export default function DailyEntryView() {
             bottlesDelivered: d.bottlesDelivered,
             rate: d.rate,
             notes: d.notes || '',
+            paymentReceived: '',
           };
         }
       );
@@ -60,6 +62,7 @@ export default function DailyEntryView() {
             bottlesDelivered: 0,
             rate: c.ratePerBottle || 100,
             notes: '',
+            paymentReceived: '',
           };
         }
       });
@@ -79,6 +82,13 @@ export default function DailyEntryView() {
     setEntries((prev) => {
       const existing = prev[customerId] || { customerId, bottlesDelivered: 0, rate: 100 };
       return { ...prev, [customerId]: { ...existing, bottlesDelivered: Math.max(0, val) } };
+    });
+  };
+
+  const handlePaymentUpdate = (customerId: string, val: string) => {
+    setEntries((prev) => {
+      const existing = prev[customerId] || { customerId, bottlesDelivered: 0, rate: 100 };
+      return { ...prev, [customerId]: { ...existing, paymentReceived: val } };
     });
   };
 
@@ -103,12 +113,20 @@ export default function DailyEntryView() {
     [entries]
   );
 
+  const totalPaymentReceived = useMemo(
+    () => Object.values(entries).reduce((sum, e) => sum + (Number(e.paymentReceived) || 0), 0),
+    [entries]
+  );
+
   const handleSaveAll = async () => {
     if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      const entryList = Object.values(entries);
+      const entryList = Object.values(entries).map((e) => ({
+        ...e,
+        paymentReceived: Number(e.paymentReceived) || 0,
+      }));
       const res = await fetch('/api/deliveries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,8 +134,10 @@ export default function DailyEntryView() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save entries');
+
+      const paymentMsg = totalPaymentReceived > 0 ? ` and Rs.${totalPaymentReceived.toLocaleString()} payments collected` : '';
       toast.success(
-        `Saved! ${totalDelivered} bottles (Rs.${totalAmountBilled.toLocaleString()}) recorded for ${selectedDate}.`
+        `Saved! ${totalDelivered} bottles (Rs.${totalAmountBilled.toLocaleString()})${paymentMsg} recorded for ${selectedDate}.`
       );
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error saving entries');
@@ -264,8 +284,11 @@ export default function DailyEntryView() {
                       <input
                         type="number"
                         min="0"
-                        value={delivered}
-                        onChange={(e) => handleUpdate(cust._id, Number(e.target.value) || 0)}
+                        placeholder="0"
+                        value={delivered === 0 ? '' : delivered}
+                        onChange={(e) =>
+                          handleUpdate(cust._id, e.target.value === '' ? 0 : Number(e.target.value))
+                        }
                         className="stepper-input"
                       />
                       <button
@@ -277,6 +300,35 @@ export default function DailyEntryView() {
                         +
                       </button>
                     </div>
+                  </div>
+
+                  {/* Optional Payment Received Input */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        color: 'var(--success)',
+                        marginBottom: 3,
+                      }}
+                    >
+                      PAYMENT RECVD
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 500"
+                      value={entry.paymentReceived || ''}
+                      onChange={(e) => handlePaymentUpdate(cust._id, e.target.value)}
+                      className="form-input"
+                      style={{
+                        width: 105,
+                        padding: '6px 8px',
+                        fontSize: '0.84rem',
+                        fontWeight: 700,
+                        borderColor: entry.paymentReceived ? 'var(--success)' : undefined,
+                      }}
+                    />
                   </div>
 
                   <div style={{ textAlign: 'right', minWidth: 70 }}>

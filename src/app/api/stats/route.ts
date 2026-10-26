@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { Customer } from '@/models/Customer';
 import { Delivery } from '@/models/Delivery';
 import { Payment } from '@/models/Payment';
+import { DailyRevenue } from '@/models/DailyRevenue';
 import { authenticateRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -18,23 +19,44 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const userObjectId = new mongoose.Types.ObjectId(session.userId);
 
+    const { searchParams } = new URL(req.url);
     const todayStr = new Date().toISOString().split('T')[0];
     const currentMonthPrefix = todayStr.substring(0, 7); // YYYY-MM
+
+    const period = searchParams.get('period') || 'month'; // 'today' | 'month'
+    const targetMonth = searchParams.get('month') || currentMonthPrefix;
+
+    // Delivery & Payment date match filters based on period
+    const deliveryMatch =
+      period === 'today'
+        ? { userId: userObjectId, date: todayStr }
+        : { userId: userObjectId, date: { $regex: `^${targetMonth}` } };
+
+    const paymentMatch =
+      period === 'today'
+        ? { userId: userObjectId, date: todayStr }
+        : { userId: userObjectId, date: { $regex: `^${targetMonth}` } };
+
+    const revenueMatch =
+      period === 'today'
+        ? { userId: userObjectId, date: todayStr }
+        : { userId: userObjectId, date: { $regex: `^${targetMonth}` } };
 
     const [
       activeCustomersCount,
       allCustomers,
-      todayDeliveries,
-      todayPayments,
-      monthDeliveriesAgg,
-      monthPaymentsAgg,
+      periodDeliveriesAgg,
+      periodPaymentsAgg,
+      periodRevenueAgg,
       allDeliveriesAgg,
       allPaymentsAgg,
+      distinctDeliveryDates,
+      distinctRevenueDates,
     ] = await Promise.all([
       Customer.countDocuments({ userId: userObjectId, isActive: true }),
       Customer.find({ userId: userObjectId }).select('initialBalance').lean(),
       Delivery.aggregate([
-        { $match: { userId: userObjectId, date: todayStr } },
+        { $match: deliveryMatch },
         {
           $group: {
             _id: null,
@@ -45,7 +67,7 @@ export async function GET(req: NextRequest) {
         },
       ]),
       Payment.aggregate([
-        { $match: { userId: userObjectId, date: todayStr } },
+        { $match: paymentMatch },
         {
           $group: {
             _id: null,
@@ -53,22 +75,16 @@ export async function GET(req: NextRequest) {
           },
         },
       ]),
-      Delivery.aggregate([
-        { $match: { userId: userObjectId, date: { $regex: `^${currentMonthPrefix}` } } },
+      DailyRevenue.aggregate([
+        { $match: revenueMatch },
         {
           $group: {
             _id: null,
-            totalBottles: { $sum: '$bottlesDelivered' },
-            totalAmount: { $sum: '$totalAmount' },
-          },
-        },
-      ]),
-      Payment.aggregate([
-        { $match: { userId: userObjectId, date: { $regex: `^${currentMonthPrefix}` } } },
-        {
-          $group: {
-            _id: null,
-            totalPaid: { $sum: '$amount' },
+            totalExpenses: { $sum: '$totalExpenses' },
+            wholesaleCost: { $sum: '$wholesaleCost' },
+            netProfit: { $sum: '$netProfit' },
+            savedBottles: { $sum: '$bottlesSold' },
+            savedBilled: { $sum: '$actualBilled' },
           },
         },
       ]),
@@ -90,6 +106,8 @@ export async function GET(req: NextRequest) {
           },
         },
       ]),
+      Delivery.distinct('date', { userId: userObjectId }),
+      DailyRevenue.distinct('date', { userId: userObjectId }),
     ]);
 
     const initialBalancesSum = allCustomers.reduce((sum, c) => sum + (c.initialBalance || 0), 0);
@@ -97,24 +115,52 @@ export async function GET(req: NextRequest) {
     const totalPaymentsReceived = allPaymentsAgg[0]?.totalReceived || 0;
     const totalPendingUdhaar = initialBalancesSum + totalDeliveriesAmount - totalPaymentsReceived;
 
+    const bottlesDelivered = periodDeliveriesAgg[0]?.bottlesDelivered || 0;
+    const billedAmount = periodDeliveriesAgg[0]?.totalAmount || 0;
+    const collectedAmount = periodPaymentsAgg[0]?.totalPaid || 0;
+
+    const totalExpenses = periodRevenueAgg[0]?.totalExpenses || 0;
+    // Calculate wholesale cost (either from saved revenue or bottles * default 35 plant cost)
+    const wholesaleCost =
+      periodRevenueAgg[0]?.wholesaleCost || bottlesDelivered * 35;
+    // Net profit = billed amount - bottle wholesale cost - expenses
+    const netProfit = billedAmount - wholesaleCost - totalExpenses;
+
+    // Build available months list
+    const monthSet = new Set<string>();
+    monthSet.add(currentMonthPrefix);
+
+    // Add previous 6 months
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthSet.add(mStr);
+    }
+
+    // Add from existing records
+    [...distinctDeliveryDates, ...distinctRevenueDates].forEach((d) => {
+      if (typeof d === 'string' && d.length >= 7) {
+        monthSet.add(d.substring(0, 7));
+      }
+    });
+
+    const availableMonths = Array.from(monthSet).sort().reverse();
+
     return NextResponse.json({
       success: true,
       stats: {
-        today: {
-          date: todayStr,
-          bottlesDelivered: todayDeliveries[0]?.bottlesDelivered || 0,
-          bottlesReturned: todayDeliveries[0]?.bottlesReturned || 0,
-          billedAmount: todayDeliveries[0]?.totalAmount || 0,
-          cashReceived: todayPayments[0]?.totalPaid || 0,
-        },
-        month: {
-          monthStr: currentMonthPrefix,
-          totalBottles: monthDeliveriesAgg[0]?.totalBottles || 0,
-          billedAmount: monthDeliveriesAgg[0]?.totalAmount || 0,
-          collectedAmount: monthPaymentsAgg[0]?.totalPaid || 0,
-        },
+        period,
+        selectedMonth: targetMonth,
+        bottlesDelivered,
+        billedAmount,
+        collectedAmount,
+        totalExpenses,
+        wholesaleCost,
+        netProfit,
         activeCustomersCount,
         totalPendingUdhaar,
+        availableMonths,
       },
     });
   } catch (error: unknown) {

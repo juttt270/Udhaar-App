@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
@@ -54,7 +54,8 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
   const [quickDeliveryCust, setQuickDeliveryCust] = useState<CustomerData | null>(null);
   const [deliveryData, setDeliveryData] = useState({
     date: new Date().toISOString().split('T')[0],
-    bottlesDelivered: 1,
+    bottlesDelivered: 1 as number | string,
+    paymentReceived: '' as number | string,
   });
   const [savingDelivery, setSavingDelivery] = useState(false);
 
@@ -184,6 +185,8 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
     savingDeliveryRef.current = true;
     setSavingDelivery(true);
     try {
+      const bottlesQty = Number(deliveryData.bottlesDelivered) || 0;
+      const paymentRecvd = Number(deliveryData.paymentReceived) || 0;
       const res = await fetch('/api/deliveries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,8 +195,9 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
           entries: [
             {
               customerId: quickDeliveryCust._id,
-              bottlesDelivered: Number(deliveryData.bottlesDelivered) || 0,
+              bottlesDelivered: bottlesQty,
               rate: quickDeliveryCust.ratePerBottle || 100,
+              paymentReceived: paymentRecvd,
             },
           ],
         }),
@@ -202,8 +206,14 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save delivery');
 
-      toast.success(`Delivery of ${deliveryData.bottlesDelivered} bottles saved for ${quickDeliveryCust.name}!`);
+      const payNote = paymentRecvd > 0 ? ` + Rs. ${paymentRecvd} payment recorded` : '';
+      toast.success(`Delivery of ${bottlesQty} bottles${payNote} saved for ${quickDeliveryCust.name}!`);
       setQuickDeliveryCust(null);
+      setDeliveryData({
+        date: new Date().toISOString().split('T')[0],
+        bottlesDelivered: 1,
+        paymentReceived: '',
+      });
       fetchCustomers();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
@@ -503,6 +513,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                       setDeliveryData({
                         date: new Date().toISOString().split('T')[0],
                         bottlesDelivered: 1,
+                        paymentReceived: '',
                       });
                     }}
                     className="btn btn-outline-primary btn-sm"
@@ -583,20 +594,46 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Bottles Delivered</label>
+                  <label className="form-label">Bottles Delivered *</label>
                   <input
                     type="number"
                     min="1"
                     required
-                    value={deliveryData.bottlesDelivered}
-                    onChange={(e) => setDeliveryData({ ...deliveryData, bottlesDelivered: Number(e.target.value) || 0 })}
+                    placeholder="1"
+                    value={deliveryData.bottlesDelivered === 0 ? '' : deliveryData.bottlesDelivered}
+                    onChange={(e) =>
+                      setDeliveryData({
+                        ...deliveryData,
+                        bottlesDelivered: e.target.value === '' ? 0 : Number(e.target.value),
+                      })
+                    }
                     className="form-input"
                     style={{ fontWeight: 700 }}
                   />
                 </div>
 
+                {/* Optional Payment Received on delivery */}
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Payment Received (Rs.)</span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 500"
+                    value={deliveryData.paymentReceived || ''}
+                    onChange={(e) =>
+                      setDeliveryData({ ...deliveryData, paymentReceived: e.target.value })
+                    }
+                    className="form-input"
+                    style={{ fontWeight: 700, borderColor: deliveryData.paymentReceived ? 'var(--success)' : undefined }}
+                  />
+                  <span className="form-hint">Record cash collected from customer right now</span>
+                </div>
+
                 <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, fontSize: '0.84rem' }}>
-                  Cost: <strong>Rs. {(deliveryData.bottlesDelivered * (quickDeliveryCust.ratePerBottle || 100)).toLocaleString()}</strong> (Rate: Rs. {quickDeliveryCust.ratePerBottle}/bottle)
+                  Cost: <strong>Rs. {((Number(deliveryData.bottlesDelivered) || 0) * (quickDeliveryCust.ratePerBottle || 100)).toLocaleString()}</strong> (Rate: Rs. {quickDeliveryCust.ratePerBottle}/bottle)
                 </div>
               </div>
               <div className="modal-footer">
@@ -604,7 +641,7 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                   Cancel
                 </button>
                 <button type="submit" disabled={savingDelivery} className="btn btn-primary">
-                  {savingDelivery ? 'Saving...' : 'Save Delivery'}
+                  {savingDelivery ? 'Saving...' : 'Save Delivery & Payment'}
                 </button>
               </div>
             </form>
@@ -770,9 +807,13 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     <input
                       type="number"
                       required
-                      value={formData.ratePerBottle}
+                      placeholder="100"
+                      value={formData.ratePerBottle === 0 ? '' : formData.ratePerBottle}
                       onChange={(e) =>
-                        setFormData({ ...formData, ratePerBottle: Number(e.target.value) || 0 })
+                        setFormData({
+                          ...formData,
+                          ratePerBottle: e.target.value === '' ? 0 : Number(e.target.value),
+                        })
                       }
                       className="form-input"
                     />
@@ -782,9 +823,13 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     <label className="form-label">Previous Balance</label>
                     <input
                       type="number"
-                      value={formData.initialBalance}
+                      placeholder="0"
+                      value={formData.initialBalance === 0 ? '' : formData.initialBalance}
                       onChange={(e) =>
-                        setFormData({ ...formData, initialBalance: Number(e.target.value) || 0 })
+                        setFormData({
+                          ...formData,
+                          initialBalance: e.target.value === '' ? 0 : Number(e.target.value),
+                        })
                       }
                       className="form-input"
                     />
@@ -796,9 +841,13 @@ export default function CustomersView({ onNavigate, defaultPlantRate, initialOpe
                     <input
                       type="number"
                       min="0"
-                      value={formData.depositBottles}
+                      placeholder="1"
+                      value={formData.depositBottles === 0 ? '' : formData.depositBottles}
                       onChange={(e) =>
-                        setFormData({ ...formData, depositBottles: Number(e.target.value) || 0 })
+                        setFormData({
+                          ...formData,
+                          depositBottles: e.target.value === '' ? 0 : Number(e.target.value),
+                        })
                       }
                       className="form-input"
                     />

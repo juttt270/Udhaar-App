@@ -14,6 +14,8 @@ import {
   Edit2,
   ArrowUpDown,
   Filter,
+  BarChart3,
+  Layers,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -27,7 +29,11 @@ interface RevenueRecord {
   _id: string;
   date: string;
   plantCostPerBottle: number;
+  autoBottles?: number;
+  extraBottles?: number;
   bottlesSold: number;
+  autoBilled?: number;
+  extraBilled?: number;
   actualBilled: number;
   cashReceived: number;
   wholesaleCost: number;
@@ -45,6 +51,9 @@ export default function RevenueProfitView() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // View mode: 'daily' (day-wise ledger) vs 'monthly' (monthly aggregate record)
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+
   // Filters & Sorting
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'profit-desc' | 'profit-asc' | 'bottles-desc'>('date-desc');
@@ -52,8 +61,12 @@ export default function RevenueProfitView() {
   // Modal Form State
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formPlantCost, setFormPlantCost] = useState<number | string>(35);
-  const [formBottles, setFormBottles] = useState<number | string>(0);
-  const [formBilled, setFormBilled] = useState<number | string>(0);
+  // Auto & Extra bottles
+  const [formAutoBottles, setFormAutoBottles] = useState<number>(0);
+  const [formExtraBottles, setFormExtraBottles] = useState<number | string>('');
+  // Auto & Extra billed
+  const [formAutoBilled, setFormAutoBilled] = useState<number>(0);
+  const [formExtraBilled, setFormExtraBilled] = useState<number | string>('');
   const [formCash, setFormCash] = useState<number | string>(0);
   const [formExpenses, setFormExpenses] = useState<Array<{ id: string; title: string; amount: number | string }>>([
     { id: 'exp-1', title: '', amount: '' },
@@ -97,12 +110,47 @@ export default function RevenueProfitView() {
         // Load existing saved record
         const s: RevenueRecord = json.saved;
         setFormPlantCost(s.plantCostPerBottle || 35);
-        setFormBottles(s.bottlesSold || 0);
-        setFormBilled(s.actualBilled || 0);
+
+        const autoBtls =
+          s.autoBottles !== undefined
+            ? s.autoBottles
+            : json.auto?.bottles !== undefined
+            ? json.auto.bottles
+            : s.bottlesSold || 0;
+        const extraBtls =
+          s.extraBottles !== undefined
+            ? s.extraBottles
+            : s.bottlesSold > autoBtls
+            ? s.bottlesSold - autoBtls
+            : '';
+
+        setFormAutoBottles(autoBtls);
+        setFormExtraBottles(extraBtls === 0 ? '' : extraBtls);
+
+        const autoBill =
+          s.autoBilled !== undefined
+            ? s.autoBilled
+            : json.auto?.billed !== undefined
+            ? json.auto.billed
+            : s.actualBilled || 0;
+        const extraBill =
+          s.extraBilled !== undefined
+            ? s.extraBilled
+            : s.actualBilled > autoBill
+            ? s.actualBilled - autoBill
+            : '';
+
+        setFormAutoBilled(autoBill);
+        setFormExtraBilled(extraBill === 0 ? '' : extraBill);
+
         setFormCash(s.cashReceived || 0);
         setFormExpenses(
           s.expenses && s.expenses.length > 0
-            ? s.expenses.map((e) => ({ id: e.id || `exp-${Date.now()}`, title: e.title, amount: e.amount }))
+            ? s.expenses.map((e) => ({
+                id: e.id || `exp-${Date.now()}`,
+                title: e.title,
+                amount: e.amount === 0 ? '' : e.amount,
+              }))
             : [{ id: 'exp-1', title: '', amount: '' }]
         );
         setFormNotes(s.notes || '');
@@ -110,8 +158,10 @@ export default function RevenueProfitView() {
         // Populate with auto values from deliveries & payments
         const auto = json.auto || { bottles: 0, billed: 0, cash: 0 };
         setFormPlantCost(35);
-        setFormBottles(auto.bottles || 0);
-        setFormBilled(auto.billed || 0);
+        setFormAutoBottles(auto.bottles || 0);
+        setFormExtraBottles('');
+        setFormAutoBilled(auto.billed || 0);
+        setFormExtraBilled('');
         setFormCash(auto.cash || 0);
         setFormExpenses([{ id: 'exp-1', title: '', amount: '' }]);
         setFormNotes('');
@@ -155,12 +205,13 @@ export default function RevenueProfitView() {
   };
 
   // Live calculations for modal
-  const calcBottles = Number(formBottles) || 0;
+  const calcTotalBottles = (Number(formAutoBottles) || 0) + (Number(formExtraBottles) || 0);
+  const calcTotalBilled = (Number(formAutoBilled) || 0) + (Number(formExtraBilled) || 0);
   const calcPlantCost = Number(formPlantCost) || 0;
-  const calcCash = Number(formCash) || 0;
-  const calcWholesale = calcBottles * calcPlantCost;
+  const calcWholesale = calcTotalBottles * calcPlantCost;
   const calcExpensesTotal = formExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const calcNetProfit = calcCash - calcWholesale - calcExpensesTotal;
+  // Profit = Total Amount - Wholesale Bottle Cost - Expenses
+  const calcNetProfit = calcTotalBilled - calcWholesale - calcExpensesTotal;
 
   // Handle Save
   const handleSaveEntry = async (e: React.FormEvent) => {
@@ -180,8 +231,12 @@ export default function RevenueProfitView() {
         body: JSON.stringify({
           date: formDate,
           plantCostPerBottle: Number(formPlantCost) || 35,
-          bottlesSold: Number(formBottles) || 0,
-          actualBilled: Number(formBilled) || 0,
+          autoBottles: Number(formAutoBottles) || 0,
+          extraBottles: Number(formExtraBottles) || 0,
+          bottlesSold: calcTotalBottles,
+          autoBilled: Number(formAutoBilled) || 0,
+          extraBilled: Number(formExtraBilled) || 0,
+          actualBilled: calcTotalBilled,
           cashReceived: Number(formCash) || 0,
           expenses: cleanExpenses,
           notes: formNotes,
@@ -237,7 +292,7 @@ export default function RevenueProfitView() {
     return Array.from(set).sort().reverse();
   }, [history]);
 
-  // Filtered & sorted entries
+  // Filtered & sorted day-wise entries
   const displayedHistory = useMemo(() => {
     let list = [...history];
 
@@ -256,6 +311,47 @@ export default function RevenueProfitView() {
 
     return list;
   }, [history, selectedMonth, sortBy]);
+
+  // Professional Monthly Aggregate Records
+  const monthlyRecords = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        month: string;
+        bottles: number;
+        billed: number;
+        wholesale: number;
+        expenses: number;
+        profit: number;
+        daysCount: number;
+      }
+    >();
+
+    history.forEach((h) => {
+      if (!h.date || h.date.length < 7) return;
+      const mo = h.date.substring(0, 7);
+      if (!map.has(mo)) {
+        map.set(mo, {
+          month: mo,
+          bottles: 0,
+          billed: 0,
+          wholesale: 0,
+          expenses: 0,
+          profit: 0,
+          daysCount: 0,
+        });
+      }
+      const item = map.get(mo)!;
+      item.bottles += Number(h.bottlesSold) || 0;
+      item.billed += Number(h.actualBilled) || 0;
+      item.wholesale += Number(h.wholesaleCost) || 0;
+      item.expenses += Number(h.totalExpenses) || 0;
+      item.profit += Number(h.netProfit) || 0;
+      item.daysCount += 1;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.month.localeCompare(a.month));
+  }, [history]);
 
   // Overall totals for filtered view
   const summaryTotals = useMemo(() => {
@@ -278,23 +374,38 @@ export default function RevenueProfitView() {
     return { bottles, billed, cash, wholesale, expenses, profit };
   }, [displayedHistory]);
 
+  const getMonthDisplay = (mStr: string) => {
+    const [y, mo] = mStr.split('-');
+    const dateObj = new Date(Number(y), Number(mo) - 1, 1);
+    return dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   return (
     <div className="page-container">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
         <div>
           <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TrendingUp size={24} color="var(--primary)" /> Revenue & Daily Ledger
+            <TrendingUp size={24} color="var(--primary)" /> Revenue &amp; Profit Ledger
           </h2>
           <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Day-wise bottle supply, actual billings, expenses, and net profit ledger
+            Wholesale bottle cost, total billed revenue, plant expenses, and net profit
           </p>
         </div>
 
         <button
           onClick={() => openEntryModal()}
           className="btn btn-primary btn-lg"
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)' }}
         >
           <Plus size={18} /> + Add / Edit Daily Entry
         </button>
@@ -304,7 +415,7 @@ export default function RevenueProfitView() {
       <div className="stats-grid" style={{ marginBottom: 18 }}>
         <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-header">
-            <span>Total Bottles Sold</span>
+            <span>Total Bottles Supplied</span>
             <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
               <Package size={18} />
             </div>
@@ -317,18 +428,18 @@ export default function RevenueProfitView() {
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderLeft: '4px solid #059669' }}>
+        <div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }}>
           <div className="stat-header">
-            <span>Cash Received</span>
-            <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+            <span>Total Billed Revenue</span>
+            <div className="stat-icon" style={{ background: '#eef2ff', color: '#4f46e5' }}>
               <Wallet size={18} />
             </div>
           </div>
-          <div className="stat-value" style={{ color: '#059669' }}>
-            {loading ? '...' : `Rs. ${summaryTotals.cash.toLocaleString()}`}
+          <div className="stat-value" style={{ color: '#4f46e5' }}>
+            {loading ? '...' : `Rs. ${summaryTotals.billed.toLocaleString()}`}
           </div>
           <div className="stat-hint">
-            Actual Billed: Rs. {summaryTotals.billed.toLocaleString()}
+            Cash Collected: Rs. {summaryTotals.cash.toLocaleString()}
           </div>
         </div>
 
@@ -342,302 +453,489 @@ export default function RevenueProfitView() {
           <div className="stat-value" style={{ color: '#dc2626' }}>
             {loading ? '...' : `Rs. ${summaryTotals.expenses.toLocaleString()}`}
           </div>
-          <div className="stat-hint">Daily other expenses</div>
+          <div className="stat-hint">Plant &amp; running costs</div>
         </div>
 
-        <div className="stat-card" style={{ borderLeft: `4px solid ${summaryTotals.profit >= 0 ? '#10b981' : '#ef4444'}` }}>
+        <div
+          className="stat-card"
+          style={{
+            borderLeft: `4px solid ${summaryTotals.profit >= 0 ? '#10b981' : '#ef4444'}`,
+          }}
+        >
           <div className="stat-header">
             <span>Net Profit</span>
-            <div className="stat-icon" style={{ background: summaryTotals.profit >= 0 ? '#ecfdf5' : '#fee2e2', color: summaryTotals.profit >= 0 ? '#10b981' : '#ef4444' }}>
+            <div
+              className="stat-icon"
+              style={{
+                background: summaryTotals.profit >= 0 ? '#ecfdf5' : '#fee2e2',
+                color: summaryTotals.profit >= 0 ? '#10b981' : '#ef4444',
+              }}
+            >
               <TrendingUp size={18} />
             </div>
           </div>
-          <div className="stat-value" style={{ color: summaryTotals.profit >= 0 ? '#10b981' : '#ef4444' }}>
+          <div
+            className="stat-value"
+            style={{ color: summaryTotals.profit >= 0 ? '#059669' : '#dc2626' }}
+          >
             {loading ? '...' : `Rs. ${summaryTotals.profit.toLocaleString()}`}
           </div>
           <div className="stat-hint">
-            {displayedHistory.length} day entries
+            (Billed - Bottle Cost - Expenses)
           </div>
         </div>
       </div>
 
-      {/* Filter & Sort Bar */}
-      <div className="card" style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Filter size={15} color="var(--primary)" />
-            <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Month:</span>
-          </div>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="form-select"
-            style={{ width: 'auto', minWidth: 150, padding: '6px 12px', fontSize: '0.86rem' }}
+      {/* Mode Switcher & Filter Bar */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        {/* Tab switch between Daily Ledger and Monthly Record */}
+        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setViewMode('daily')}
+            style={{
+              padding: '8px 16px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              border: 'none',
+              background: viewMode === 'daily' ? 'var(--primary)' : '#ffffff',
+              color: viewMode === 'daily' ? '#ffffff' : 'var(--text-main)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
           >
-            <option value="all">All Months</option>
-            {availableMonths.map((m) => {
-              const [y, mo] = m.split('-');
-              const dateObj = new Date(Number(y), Number(mo) - 1, 1);
-              const label = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-              return (
-                <option key={m} value={m}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+            <Layers size={16} /> Day-Wise Ledger
+          </button>
+          <button
+            onClick={() => setViewMode('monthly')}
+            style={{
+              padding: '8px 16px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              border: 'none',
+              background: viewMode === 'monthly' ? 'var(--primary)' : '#ffffff',
+              color: viewMode === 'monthly' ? '#ffffff' : 'var(--text-main)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <BarChart3 size={16} /> Monthly Record (ماہانہ رپورٹ)
+          </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ArrowUpDown size={15} color="var(--primary)" />
-            <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Sort By:</span>
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="form-select"
-            style={{ width: 'auto', minWidth: 160, padding: '6px 12px', fontSize: '0.86rem' }}
-          >
-            <option value="date-desc">Date (Newest First)</option>
-            <option value="date-asc">Date (Oldest First)</option>
-            <option value="profit-desc">Profit (Highest First)</option>
-            <option value="profit-asc">Profit (Lowest First)</option>
-            <option value="bottles-desc">Bottles (Highest First)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Day-Wise Ledger List */}
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--text-muted)' }}>
-            Loading revenue entries...
-          </div>
-        ) : displayedHistory.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
-            <p style={{ marginBottom: 12 }}>No daily revenue entries saved yet.</p>
-            <button onClick={() => openEntryModal()} className="btn btn-primary btn-sm">
-              <Plus size={15} /> Add First Daily Entry
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Mobile Cards View */}
-            <div className="payment-mobile-list">
-              {displayedHistory.map((h) => (
-                <div
-                  key={h._id}
-                  style={{
-                    padding: '14px',
-                    borderBottom: '1px solid #f1f5f9',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 10,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
-                      {h.date}
-                    </div>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 14,
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
-                        color: h.netProfit >= 0 ? '#059669' : '#dc2626',
-                      }}
-                    >
-                      Profit: Rs. {h.netProfit.toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: '#f8fafc', padding: 10, borderRadius: 8, fontSize: '0.82rem' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Bottles Sold: </span>
-                      <strong style={{ color: 'var(--primary)', fontSize: '0.92rem' }}>{h.bottlesSold}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
-                      <strong style={{ color: '#d97706' }}>Rs. {h.wholesaleCost.toLocaleString()}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Actual Billed: </span>
-                      <strong>Rs. {h.actualBilled.toLocaleString()}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Cash Received: </span>
-                      <strong style={{ color: 'var(--success)' }}>Rs. {h.cashReceived.toLocaleString()}</strong>
-                    </div>
-                  </div>
-
-                  {/* Expenses chips */}
-                  {h.expenses && h.expenses.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Expenses:</span>
-                      {h.expenses.map((e, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: '0.74rem',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            padding: '2px 7px',
-                            borderRadius: 4,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {e.title}: Rs.{e.amount}
-                        </span>
-                      ))}
-                      <strong style={{ fontSize: '0.75rem', color: '#dc2626' }}>
-                        (Total: Rs. {h.totalExpenses.toLocaleString()})
-                      </strong>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      No expenses on this date
-                    </div>
-                  )}
-
-                  {h.notes && (
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      &ldquo;{h.notes}&rdquo;
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button
-                      onClick={() => openEntryModal(h.date)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      <Edit2 size={13} /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(h._id)}
-                      disabled={deletingId === h._id}
-                      className="toast-close"
-                      title="Delete entry"
-                    >
-                      <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+        {/* Filters if in daily mode */}
+        {viewMode === 'daily' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Filter size={15} color="var(--primary)" />
+              <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Month:</span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', minWidth: 150, padding: '5px 10px', fontSize: '0.84rem' }}
+              >
+                <option value="all">All Months</option>
+                {availableMonths.map((m) => (
+                  <option key={m} value={m}>
+                    {getMonthDisplay(m)}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Desktop Table View */}
-            <div className="payment-desktop-table" style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ArrowUpDown size={15} color="var(--primary)" />
+              <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="form-select"
+                style={{ width: 'auto', minWidth: 150, padding: '5px 10px', fontSize: '0.84rem' }}
+              >
+                <option value="date-desc">Date (Newest First)</option>
+                <option value="date-asc">Date (Oldest First)</option>
+                <option value="profit-desc">Profit (Highest First)</option>
+                <option value="profit-asc">Profit (Lowest First)</option>
+                <option value="bottles-desc">Bottles (Highest First)</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main View: Day-Wise Ledger or Monthly Record */}
+      {viewMode === 'monthly' ? (
+        /* PROFESSIONAL MONTHLY RECORD VIEW */
+        <div className="card" style={{ padding: 0 }}>
+          <div className="card-header" style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)' }}>
+            <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BarChart3 size={20} color="var(--primary)" /> Monthly Performance &amp; Profit Summary
+            </h3>
+          </div>
+
+          {monthlyRecords.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+              No monthly data available yet.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                    <th style={{ padding: '12px 14px' }}>Date</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>Bottles Sold</th>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 14px' }}>Month</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>Days Logged</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>Total Bottles</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Billed (Revenue)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Wholesale Cost</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actual Billed</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Cash Received</th>
-                    <th style={{ padding: '12px 14px' }}>Expenses Detail</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Expenses</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedHistory.map((h) => (
-                    <tr key={h._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 14px', fontWeight: 800 }}>{h.date}</td>
-                      <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
-                        {h.bottlesSold}
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
-                        Rs. {h.wholesaleCost.toLocaleString()}
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@ Rs.{h.plantCostPerBottle}/btl</div>
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600 }}>
-                        Rs. {h.actualBilled.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 800 }}>
-                        Rs. {h.cashReceived.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px 14px', maxWidth: 220 }}>
-                        {h.expenses && h.expenses.length > 0 ? (
-                          <div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                              {h.expenses.map((e, idx) => (
-                                <span
-                                  key={idx}
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    background: '#fee2e2',
-                                    color: '#dc2626',
-                                    padding: '1px 6px',
-                                    borderRadius: 4,
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  {e.title}: {e.amount}
-                                </span>
-                              ))}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', marginTop: 3 }}>
-                              Total: Rs. {h.totalExpenses.toLocaleString()}
-                            </div>
+                  {monthlyRecords.map((m) => {
+                    const margin = m.billed > 0 ? Math.round((m.profit / m.billed) * 100) : 0;
+                    return (
+                      <tr key={m.month} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 14px', fontWeight: 800, color: 'var(--text-main)' }}>
+                          {getMonthDisplay(m.month)}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <span className="badge badge-info">{m.daysCount} days</span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                          {m.bottles.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                          Rs. {m.billed.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
+                          Rs. {m.wholesale.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>
+                          Rs. {m.expenses.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 12,
+                                fontSize: '0.86rem',
+                                fontWeight: 800,
+                                background: m.profit >= 0 ? '#ecfdf5' : '#fee2e2',
+                                color: m.profit >= 0 ? '#059669' : '#dc2626',
+                              }}
+                            >
+                              Rs. {m.profit.toLocaleString()}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                              Margin: {margin}%
+                            </span>
                           </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                        <span
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 12,
-                            fontSize: '0.85rem',
-                            fontWeight: 800,
-                            background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
-                            color: h.netProfit >= 0 ? '#059669' : '#dc2626',
-                          }}
-                        >
-                          Rs. {h.netProfit.toLocaleString()}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           <button
-                            onClick={() => openEntryModal(h.date)}
+                            onClick={() => {
+                              setSelectedMonth(m.month);
+                              setViewMode('daily');
+                            }}
                             className="btn btn-secondary btn-sm"
-                            title="Edit entry"
+                            style={{ fontSize: '0.76rem' }}
                           >
-                            <Edit2 size={13} />
+                            View Days
                           </button>
-                          <button
-                            onClick={() => handleDelete(h._id)}
-                            disabled={deletingId === h._id}
-                            className="toast-close"
-                            title="Delete entry"
-                          >
-                            <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        /* DAY-WISE LEDGER VIEW */
+        <div className="card" style={{ padding: 0 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--text-muted)' }}>
+              Loading revenue entries...
+            </div>
+          ) : displayedHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+              <p style={{ marginBottom: 12 }}>No daily revenue entries saved yet.</p>
+              <button onClick={() => openEntryModal()} className="btn btn-primary btn-sm">
+                <Plus size={15} /> Add First Daily Entry
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Mobile Cards View */}
+              <div className="payment-mobile-list">
+                {displayedHistory.map((h) => (
+                  <div
+                    key={h._id}
+                    style={{
+                      padding: '14px',
+                      borderBottom: '1px solid #f1f5f9',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
+                        {h.date}
+                      </div>
+                      <span
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 14,
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
+                          color: h.netProfit >= 0 ? '#059669' : '#dc2626',
+                        }}
+                      >
+                        Profit: Rs. {h.netProfit.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 8,
+                        background: '#f8fafc',
+                        padding: 10,
+                        borderRadius: 8,
+                        fontSize: '0.82rem',
+                      }}
+                    >
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Total Bottles: </span>
+                        <strong style={{ color: 'var(--primary)', fontSize: '0.92rem' }}>
+                          {h.bottlesSold}
+                          {h.extraBottles ? (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {' '}
+                              ({h.autoBottles || 0} + {h.extraBottles})
+                            </span>
+                          ) : null}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
+                        <strong style={{ color: '#d97706' }}>Rs. {h.wholesaleCost.toLocaleString()}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Actual Billed: </span>
+                        <strong>
+                          Rs. {h.actualBilled.toLocaleString()}
+                          {h.extraBilled ? (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {' '}
+                              (+{h.extraBilled})
+                            </span>
+                          ) : null}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Cash In: </span>
+                        <strong style={{ color: 'var(--success)' }}>Rs. {h.cashReceived.toLocaleString()}</strong>
+                      </div>
+                    </div>
+
+                    {/* Expenses chips */}
+                    {h.expenses && h.expenses.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Expenses:</span>
+                        {h.expenses.map((e, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              fontSize: '0.74rem',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              padding: '2px 7px',
+                              borderRadius: 4,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {e.title}: Rs.{e.amount}
+                          </span>
+                        ))}
+                        <strong style={{ fontSize: '0.75rem', color: '#dc2626' }}>
+                          (Total: Rs. {h.totalExpenses.toLocaleString()})
+                        </strong>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        No expenses on this date
+                      </div>
+                    )}
+
+                    {h.notes && (
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        &ldquo;{h.notes}&rdquo;
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button
+                        onClick={() => openEntryModal(h.date)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Edit2 size={13} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(h._id)}
+                        disabled={deletingId === h._id}
+                        className="toast-close"
+                        title="Delete entry"
+                      >
+                        <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="payment-desktop-table" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                      <th style={{ padding: '12px 14px' }}>Date</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>Bottles Sold</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Wholesale Cost</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Billed (Revenue)</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Cash Received</th>
+                      <th style={{ padding: '12px 14px' }}>Expenses Detail</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedHistory.map((h) => (
+                      <tr key={h._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 14px', fontWeight: 800 }}>{h.date}</td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                          {h.bottlesSold}
+                          {h.extraBottles ? (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              Auto: {h.autoBottles || 0} + Extra: {h.extraBottles}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
+                          Rs. {h.wholesaleCost.toLocaleString()}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@ Rs.{h.plantCostPerBottle}/btl</div>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                          Rs. {h.actualBilled.toLocaleString()}
+                          {h.extraBilled ? (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              Auto: Rs.{h.autoBilled || 0} + Extra: Rs.{h.extraBilled}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 800 }}>
+                          Rs. {h.cashReceived.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 14px', maxWidth: 220 }}>
+                          {h.expenses && h.expenses.length > 0 ? (
+                            <div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {h.expenses.map((e, idx) => (
+                                  <span
+                                    key={idx}
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      background: '#fee2e2',
+                                      color: '#dc2626',
+                                      padding: '1px 6px',
+                                      borderRadius: 4,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {e.title}: {e.amount}
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', marginTop: 3 }}>
+                                Total: Rs. {h.totalExpenses.toLocaleString()}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
+                              color: h.netProfit >= 0 ? '#059669' : '#dc2626',
+                            }}
+                          >
+                            Rs. {h.netProfit.toLocaleString()}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                            <button
+                              onClick={() => openEntryModal(h.date)}
+                              className="btn btn-secondary btn-sm"
+                              title="Edit entry"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(h._id)}
+                              disabled={deletingId === h._id}
+                              className="toast-close"
+                              title="Delete entry"
+                            >
+                              <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Add / Edit Daily Entry Modal */}
       {modalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 540 }}>
+          <div className="modal-content" style={{ maxWidth: 560 }}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <TrendingUp size={20} color="var(--primary)" /> Daily Revenue & Expense Entry
+                <TrendingUp size={20} color="var(--primary)" /> Daily Revenue &amp; Expense Entry
               </h3>
               <button onClick={() => setModalOpen(false)} className="toast-close">
                 <X size={18} />
@@ -647,8 +945,8 @@ export default function RevenueProfitView() {
             <form onSubmit={handleSaveEntry}>
               <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
                 {/* Date & Plant Rate Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
-                  <div className="form-group">
+                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Date *</label>
                     <input
                       type="date"
@@ -663,67 +961,154 @@ export default function RevenueProfitView() {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Plant Cost/Bottle</label>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Plant Cost/Bottle (Rs.)</label>
                     <input
                       type="number"
                       min="0"
                       required
-                      value={formPlantCost}
-                      onChange={(e) => setFormPlantCost(e.target.value)}
-                      className="form-input"
                       placeholder="35"
+                      value={formPlantCost === 0 ? '' : formPlantCost}
+                      onChange={(e) =>
+                        setFormPlantCost(e.target.value === '' ? 0 : Number(e.target.value))
+                      }
+                      className="form-input"
                       style={{ fontWeight: 700 }}
                     />
                   </div>
                 </div>
 
                 {loadingDateData && (
-                  <div style={{ fontSize: '0.78rem', color: 'var(--primary)', marginBottom: 8 }}>
-                    Fetching delivery & payment records for {formDate}...
+                  <div style={{ fontSize: '0.78rem', color: 'var(--primary)', marginBottom: 10 }}>
+                    Fetching delivery &amp; payment records for {formDate}...
                   </div>
                 )}
 
-                {/* Bottles Sold, Actual Billed, and Cash Received */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 4 }}>
-                  <div className="form-group">
-                    <label className="form-label">Bottles Sold *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={formBottles}
-                      onChange={(e) => setFormBottles(e.target.value)}
-                      className="form-input"
-                      style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)' }}
-                    />
-                    <span className="form-hint">Editable bottles</span>
+                {/* 1. Bottles: Auto (Readonly) + Extra (Optional) = Total Bottles */}
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    padding: '12px 14px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border-color)',
+                    marginBottom: 12,
+                  }}
+                >
+                  <label
+                    className="form-label"
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: 8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>Bottles Delivered &amp; Sold</span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 800 }}>
+                      Total: {calcTotalBottles} Bottles
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Auto (Deliveries)
+                      </span>
+                      <input
+                        type="number"
+                        readOnly
+                        value={formAutoBottles}
+                        className="form-input"
+                        title="Readonly: Auto fetched from daily deliveries"
+                        style={{
+                          background: '#e2e8f0',
+                          color: 'var(--text-main)',
+                          fontWeight: 800,
+                          cursor: 'not-allowed',
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)', paddingTop: 14 }}>
+                      +
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Extra Bottles (Optional)
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={formExtraBottles === 0 ? '' : formExtraBottles}
+                        onChange={(e) => setFormExtraBottles(e.target.value)}
+                        className="form-input"
+                        style={{ fontWeight: 700 }}
+                      />
+                    </div>
                   </div>
+                </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Actual Billed</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formBilled}
-                      onChange={(e) => setFormBilled(e.target.value)}
-                      className="form-input"
-                      style={{ fontWeight: 700 }}
-                    />
-                    <span className="form-hint">Rs. billed</span>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Cash Received</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formCash}
-                      onChange={(e) => setFormCash(e.target.value)}
-                      className="form-input"
-                      style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--success)' }}
-                    />
-                    <span className="form-hint">Rs. cash in</span>
+                {/* 2. Amount / Revenue: Auto Billed (Readonly) + Extra Amount (Optional) = Total Billed */}
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    padding: '12px 14px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border-color)',
+                    marginBottom: 12,
+                  }}
+                >
+                  <label
+                    className="form-label"
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: 8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>Total Amount Billed (Revenue)</span>
+                    <span style={{ fontSize: '0.85rem', color: '#047857', fontWeight: 800 }}>
+                      Total: Rs. {calcTotalBilled.toLocaleString()}
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Auto Billed (Deliveries)
+                      </span>
+                      <input
+                        type="number"
+                        readOnly
+                        value={formAutoBilled}
+                        className="form-input"
+                        title="Readonly: Auto calculated from daily deliveries"
+                        style={{
+                          background: '#e2e8f0',
+                          color: 'var(--text-main)',
+                          fontWeight: 800,
+                          cursor: 'not-allowed',
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)', paddingTop: 14 }}>
+                      +
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Extra Amount (Optional)
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={formExtraBilled === 0 ? '' : formExtraBilled}
+                        onChange={(e) => setFormExtraBilled(e.target.value)}
+                        className="form-input"
+                        style={{ fontWeight: 700 }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -783,7 +1168,7 @@ export default function RevenueProfitView() {
                   )}
                 </div>
 
-                {/* Live Net Profit Box */}
+                {/* Live Net Profit Box (Profit = Total Amount - Wholesale Cost - Expenses) */}
                 <div
                   style={{
                     background: '#f8fafc',
@@ -794,22 +1179,30 @@ export default function RevenueProfitView() {
                     gridTemplateColumns: '1fr 1fr',
                     gap: 8,
                     fontSize: '0.84rem',
+                    border: '1px solid var(--border-color)',
                   }}
                 >
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
                     <strong style={{ color: '#d97706' }}>Rs. {calcWholesale.toLocaleString()}</strong>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      ({calcTotalBottles} btl × Rs.{calcPlantCost})
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Daily Net Profit: </span>
                     <strong
                       style={{
                         color: calcNetProfit >= 0 ? '#059669' : '#dc2626',
-                        fontSize: '1.05rem',
+                        fontSize: '1.1rem',
+                        display: 'block',
                       }}
                     >
                       Rs. {calcNetProfit.toLocaleString()}
                     </strong>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      (Total Billed - Wholesale Cost - Expenses)
+                    </div>
                   </div>
                 </div>
 
@@ -821,7 +1214,7 @@ export default function RevenueProfitView() {
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
                     className="form-input"
-                    placeholder="e.g. Delivered 20 bottles by rider, payment collected in evening"
+                    placeholder="e.g. Delivered 20 bottles by rider, paid petrol"
                   />
                 </div>
               </div>
@@ -836,7 +1229,7 @@ export default function RevenueProfitView() {
                   className="btn btn-primary"
                   style={{ minWidth: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
-                  {submitting ? 'Saving...' : <><CheckCircle2 size={16} /> Save Entry</>}
+                  {submitting ? 'Saving...' : <><CheckCircle2 size={16} /> Save Daily Entry</>}
                 </button>
               </div>
             </form>

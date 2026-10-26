@@ -10,7 +10,11 @@ export interface IDailyRevenue extends Document {
   userId: Types.ObjectId;
   date: string;
   plantCostPerBottle: number;
+  autoBottles?: number;
+  extraBottles?: number;
   bottlesSold: number;
+  autoBilled?: number;
+  extraBilled?: number;
   actualBilled: number;
   cashReceived: number;
   wholesaleCost: number;
@@ -36,7 +40,11 @@ const DailyRevenueSchema = new Schema<IDailyRevenue>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     date: { type: String, required: true, index: true },
     plantCostPerBottle: { type: Number, required: true, default: 35 },
+    autoBottles: { type: Number, default: 0 },
+    extraBottles: { type: Number, default: 0 },
     bottlesSold: { type: Number, required: true, default: 0 },
+    autoBilled: { type: Number, default: 0 },
+    extraBilled: { type: Number, default: 0 },
     actualBilled: { type: Number, required: true, default: 0 },
     cashReceived: { type: Number, required: true, default: 0 },
     wholesaleCost: { type: Number, required: true, default: 0 },

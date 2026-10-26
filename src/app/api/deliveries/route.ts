@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/mongodb';
 import { Delivery } from '@/models/Delivery';
+import { Payment } from '@/models/Payment';
 import { authenticateRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,8 @@ interface DeliveryInputItem {
   bottlesReturned?: number;
   rate?: number;
   notes?: string;
+  paymentReceived?: number;
+  paymentMethod?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -65,6 +68,7 @@ export async function POST(req: NextRequest) {
 
     const userObjectId = new mongoose.Types.ObjectId(session.userId);
     const bulkOps = [];
+    const paymentsToCreate = [];
 
     for (const entry of entries) {
       if (!entry.customerId) continue;
@@ -74,8 +78,23 @@ export async function POST(req: NextRequest) {
       const returned = Math.max(0, Number(entry.bottlesReturned) || 0);
       const rate = Math.max(0, Number(entry.rate) || 100);
       const totalAmount = delivered * rate;
+      const paymentReceived = Math.max(0, Number(entry.paymentReceived) || 0);
 
-      if (delivered === 0 && returned === 0 && !entry.notes) {
+      if (paymentReceived > 0) {
+        paymentsToCreate.push({
+          userId: userObjectId,
+          customerId: customerObjectId,
+          date,
+          amount: paymentReceived,
+          paymentMethod: entry.paymentMethod || 'Cash',
+          receiptNo: `DEL-${Date.now().toString().slice(-6)}`,
+          notes: entry.notes?.trim()
+            ? `Received with delivery: ${entry.notes.trim()}`
+            : `Cash received during delivery (${delivered} btl)`,
+        });
+      }
+
+      if (delivered === 0 && returned === 0 && !entry.notes && paymentReceived === 0) {
         // If 0 delivered & 0 returned, delete any existing record for this day
         bulkOps.push({
           deleteOne: {
@@ -106,6 +125,10 @@ export async function POST(req: NextRequest) {
 
     if (bulkOps.length > 0) {
       await Delivery.bulkWrite(bulkOps);
+    }
+
+    if (paymentsToCreate.length > 0) {
+      await Payment.insertMany(paymentsToCreate);
     }
 
     // Return updated totals for the date

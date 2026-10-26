@@ -151,67 +151,115 @@ export function generateCustomerMonthlyPDF(data: MonthlyReportData) {
   });
 
   // ── Daily Ledger Table (delivery only — no returned column) ──
+  // ── ERP Customer Ledger Table with Running Balance ──
   currentY = 89;
 
-  const deliveryMap = new Map<string, { delivered: number; rate: number; total: number; notes: string }>();
+  type EventItem =
+    | { type: 'delivery'; date: string; bottles: number; rate: number; amount: number; desc: string }
+    | { type: 'payment'; date: string; amount: number; desc: string };
+
+  const events: EventItem[] = [];
+
   data.monthDeliveries.forEach((d) => {
-    deliveryMap.set(d.date, {
-      delivered: d.bottlesDelivered,
+    events.push({
+      type: 'delivery',
+      date: d.date,
+      bottles: d.bottlesDelivered,
       rate: d.rate,
-      total: d.totalAmount,
-      notes: d.notes || '',
+      amount: d.totalAmount,
+      desc: `Delivery (${d.bottlesDelivered} Bottles @ Rs.${d.rate})${d.notes ? ` · ${d.notes}` : ''}`,
     });
   });
 
-  const paymentMap = new Map<string, { amount: number; method: string; receipt: string }>();
   data.monthPayments.forEach((p) => {
-    paymentMap.set(p.date, { amount: p.amount, method: p.paymentMethod, receipt: p.receiptNo || '' });
+    events.push({
+      type: 'payment',
+      date: p.date,
+      amount: p.amount,
+      desc: `Payment (${p.paymentMethod}${p.receiptNo ? ` #${p.receiptNo}` : ''})${p.notes ? ` · ${p.notes}` : ''}`,
+    });
   });
 
-  const allDates = Array.from(new Set([...deliveryMap.keys(), ...paymentMap.keys()])).sort();
+  events.sort((a, b) => {
+    const c = a.date.localeCompare(b.date);
+    if (c !== 0) return c;
+    return a.type === 'delivery' ? -1 : 1;
+  });
+
   const tableRows: (string | number)[][] = [];
+  let runningBal = data.openingBalance || 0;
 
-  allDates.forEach((date) => {
-    const del = deliveryMap.get(date);
-    const pay = paymentMap.get(date);
-    const dObj = new Date(date + 'T00:00:00');
-    const dayStr = dObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', weekday: 'short' });
-    tableRows.push([
-      dayStr,
-      del ? del.delivered : '-',
-      del ? `${currency} ${del.rate}` : '-',
-      del ? `${currency} ${del.total.toLocaleString()}` : '-',
-      pay ? `${currency} ${pay.amount.toLocaleString()} (${pay.method})` : '-',
-    ]);
+  // 1. Opening Balance Row
+  tableRows.push([
+    `${data.month}-01`,
+    'Opening Balance (سابقہ بقایا)',
+    '-',
+    '-',
+    '-',
+    `${currency} ${runningBal.toLocaleString()}`,
+  ]);
+
+  events.forEach((ev) => {
+    const dObj = new Date(ev.date + 'T00:00:00');
+    const dayStr = dObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+    if (ev.type === 'delivery') {
+      runningBal += ev.amount;
+      tableRows.push([
+        dayStr,
+        ev.desc,
+        ev.bottles,
+        `${currency} ${ev.amount.toLocaleString()}`,
+        '-',
+        `${currency} ${runningBal.toLocaleString()}`,
+      ]);
+    } else {
+      runningBal -= ev.amount;
+      tableRows.push([
+        dayStr,
+        ev.desc,
+        '-',
+        '-',
+        `${currency} ${ev.amount.toLocaleString()}`,
+        `${currency} ${runningBal.toLocaleString()}`,
+      ]);
+    }
   });
 
-  if (tableRows.length === 0) {
-    tableRows.push(['No deliveries or payments recorded this month.', '-', '-', '-', '-']);
-  }
-
+  // Total Summary Row
   tableRows.push([
-    'TOTALS',
+    'CLOSING BALANCE',
+    'Total Month Activity',
     data.monthBottlesDelivered,
-    '-',
     `${currency} ${data.monthBilling.toLocaleString()}`,
     `${currency} ${data.monthPaymentsTotal.toLocaleString()}`,
+    `${currency} ${data.closingBalance.toLocaleString()}`,
   ]);
 
   autoTable(doc, {
     startY: currentY,
-    head: [['Date / Day', 'Bottles Delivered', 'Rate', 'Total Bill', 'Payment Received']],
+    head: [['Date', 'Particulars / Description', 'Bottles', 'Charges (+)', 'Paid (-)', 'Balance']],
     body: tableRows,
     theme: 'striped',
     headStyles: { fillColor: BRAND_COLOR, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
-    styles: { fontSize: 8, cellPadding: 2.2, halign: 'center', textColor: [30, 41, 59] },
+    styles: { fontSize: 7.8, cellPadding: 2, halign: 'center', textColor: [30, 41, 59] },
     columnStyles: {
-      0: { halign: 'left', fontStyle: 'bold' },
-      3: { fontStyle: 'bold', textColor: [15, 23, 42] },
-      4: { fontStyle: 'bold', textColor: [5, 150, 105] },
+      0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
+      1: { halign: 'left', cellWidth: 'auto' },
+      2: { halign: 'center', cellWidth: 16 },
+      3: { halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42], cellWidth: 26 },
+      4: { halign: 'right', fontStyle: 'bold', textColor: [5, 150, 105], cellWidth: 26 },
+      5: { halign: 'right', fontStyle: 'bold', textColor: [3, 105, 161], cellWidth: 28 },
     },
     didParseCell: (hookData) => {
-      if (hookData.row.index === tableRows.length - 1) {
+      // Opening balance row styling
+      if (hookData.row.index === 0) {
         hookData.cell.styles.fillColor = [241, 245, 249];
+        hookData.cell.styles.fontStyle = 'bold';
+      }
+      // Closing balance total row styling
+      if (hookData.row.index === tableRows.length - 1) {
+        hookData.cell.styles.fillColor = [238, 242, 255];
         hookData.cell.styles.fontStyle = 'bold';
         hookData.cell.styles.textColor = [15, 23, 42];
       }

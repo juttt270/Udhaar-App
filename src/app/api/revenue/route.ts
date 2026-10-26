@@ -72,8 +72,12 @@ export async function POST(req: NextRequest) {
     const {
       date,
       plantCostPerBottle = 35,
-      bottlesSold = 0,
-      actualBilled = 0,
+      autoBottles = 0,
+      extraBottles = 0,
+      bottlesSold,
+      autoBilled = 0,
+      extraBilled = 0,
+      actualBilled,
       cashReceived = 0,
       expenses = [],
       notes = '',
@@ -87,28 +91,45 @@ export async function POST(req: NextRequest) {
     const userObjId = new mongoose.Types.ObjectId(session.userId);
 
     const plantCost = Math.max(Number(plantCostPerBottle) || 0, 0);
-    const bottles = Math.max(Number(bottlesSold) || 0, 0);
-    const billed = Math.max(Number(actualBilled) || 0, 0);
+    const parsedAutoBottles = Math.max(Number(autoBottles) || 0, 0);
+    const parsedExtraBottles = Math.max(Number(extraBottles) || 0, 0);
+    const bottles = bottlesSold !== undefined
+      ? Math.max(Number(bottlesSold) || 0, 0)
+      : parsedAutoBottles + parsedExtraBottles;
+
+    const parsedAutoBilled = Math.max(Number(autoBilled) || 0, 0);
+    const parsedExtraBilled = Math.max(Number(extraBilled) || 0, 0);
+    const billed = actualBilled !== undefined
+      ? Math.max(Number(actualBilled) || 0, 0)
+      : parsedAutoBilled + parsedExtraBilled;
+
     const cash = Math.max(Number(cashReceived) || 0, 0);
 
     const wholesaleCost = bottles * plantCost;
     const cleanExpenses: IDailyExpense[] = Array.isArray(expenses)
-      ? expenses.map((e: { id?: string; title: string; amount: number }) => ({
-          id: e.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          title: String(e.title || '').trim(),
-          amount: Math.max(Number(e.amount) || 0, 0),
-        })).filter(e => e.title && e.amount > 0)
+      ? expenses
+          .map((e: { id?: string; title: string; amount: number }) => ({
+            id: e.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            title: String(e.title || '').trim(),
+            amount: Math.max(Number(e.amount) || 0, 0),
+          }))
+          .filter((e) => e.title && e.amount > 0)
       : [];
 
     const totalExpenses = cleanExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = cash - wholesaleCost - totalExpenses;
+    // User requested formula: Total Amount billed minus wholesale bottle cost minus other expenses
+    const netProfit = billed - wholesaleCost - totalExpenses;
 
     const record = await DailyRevenue.findOneAndUpdate(
       { userId: userObjId, date },
       {
         $set: {
           plantCostPerBottle: plantCost,
+          autoBottles: parsedAutoBottles,
+          extraBottles: parsedExtraBottles,
           bottlesSold: bottles,
+          autoBilled: parsedAutoBilled,
+          extraBilled: parsedExtraBilled,
           actualBilled: billed,
           cashReceived: cash,
           wholesaleCost,

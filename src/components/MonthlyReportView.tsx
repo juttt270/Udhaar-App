@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FileText, Download, Calendar, MessageCircle, CheckCircle } from 'lucide-react';
 import { useToast } from './Toast';
 import CustomerDropdown from './CustomerDropdown';
@@ -17,6 +17,17 @@ interface MonthlyReportViewProps {
   initialCustomerId?: string;
 }
 
+interface LedgerRow {
+  id: string;
+  date: string;
+  type: 'opening' | 'delivery' | 'payment';
+  description: string;
+  bottles: number | string;
+  charges: number | string;
+  payment: number | string;
+  balance: number;
+}
+
 export default function MonthlyReportView({ initialCustomerId }: MonthlyReportViewProps) {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustomerId || '');
@@ -31,7 +42,7 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
   const customersLoaded = useRef(false);
   const downloadingRef = useRef(false);
 
-  // Load customers once
+  // Load customers once - Default to NO customer selected
   useEffect(() => {
     if (customersLoaded.current) return;
     customersLoaded.current = true;
@@ -43,8 +54,9 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
         setCustomers(list);
         if (initialCustomerId) {
           setSelectedCustomerId(initialCustomerId);
-        } else if (list.length > 0) {
-          setSelectedCustomerId((prev) => prev || list[0]._id);
+        } else {
+          // Requirement: default par koi customer select na ho
+          setSelectedCustomerId('');
         }
       } catch {
         toast.error('Failed to load customers list');
@@ -54,7 +66,10 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
   }, [initialCustomerId, toast]);
 
   const loadReport = useCallback(async () => {
-    if (!selectedCustomerId || !selectedMonth) return;
+    if (!selectedCustomerId || !selectedMonth) {
+      setReportData(null);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`/api/reports/monthly?customerId=${selectedCustomerId}&month=${selectedMonth}`);
@@ -70,7 +85,11 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
   }, [selectedCustomerId, selectedMonth, toast]);
 
   useEffect(() => {
-    if (selectedCustomerId) loadReport();
+    if (selectedCustomerId) {
+      loadReport();
+    } else {
+      setReportData(null);
+    }
   }, [selectedCustomerId, selectedMonth, loadReport]);
 
   const handleDownloadPDF = () => {
@@ -109,15 +128,80 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
     window.open(url, '_blank');
   };
 
+  // Build Chronological ERP Customer Ledger with Running Balance
+  const ledgerRows = useMemo(() => {
+    if (!reportData) return [];
+    const rows: LedgerRow[] = [];
+    let running = reportData.openingBalance || 0;
+
+    // 1. Opening Balance Row
+    rows.push({
+      id: 'opening-bal',
+      date: `${reportData.month}-01`,
+      type: 'opening',
+      description: 'Opening Balance (سابقہ بقایا)',
+      bottles: '-',
+      charges: '-',
+      payment: '-',
+      balance: running,
+    });
+
+    const events: Array<
+      | { type: 'delivery'; date: string; data: (typeof reportData.monthDeliveries)[0] }
+      | { type: 'payment'; date: string; data: (typeof reportData.monthPayments)[0] }
+    > = [
+      ...reportData.monthDeliveries.map((d) => ({ type: 'delivery' as const, date: d.date, data: d })),
+      ...reportData.monthPayments.map((p) => ({ type: 'payment' as const, date: p.date, data: p })),
+    ];
+
+    events.sort((a, b) => {
+      const dComp = a.date.localeCompare(b.date);
+      if (dComp !== 0) return dComp;
+      return a.type === 'delivery' ? -1 : 1;
+    });
+
+    events.forEach((ev, idx) => {
+      if (ev.type === 'delivery') {
+        const d = ev.data;
+        running += d.totalAmount;
+        rows.push({
+          id: `del-${idx}-${d.date}`,
+          date: d.date,
+          type: 'delivery',
+          description: `Delivery: ${d.bottlesDelivered} Bottles (@ Rs.${d.rate})${d.notes ? ` · ${d.notes}` : ''}`,
+          bottles: d.bottlesDelivered,
+          charges: d.totalAmount,
+          payment: '-',
+          balance: running,
+        });
+      } else {
+        const p = ev.data;
+        running -= p.amount;
+        rows.push({
+          id: `pay-${idx}-${p.date}`,
+          date: p.date,
+          type: 'payment',
+          description: `Payment: ${p.paymentMethod}${p.receiptNo ? ` (#${p.receiptNo})` : ''}${p.notes ? ` · ${p.notes}` : ''}`,
+          bottles: '-',
+          charges: '-',
+          payment: p.amount,
+          balance: running,
+        });
+      }
+    });
+
+    return rows;
+  }, [reportData]);
+
   return (
     <div className="page-container">
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileText size={22} color="var(--primary)" /> Monthly Bill &amp; PDF
+          <FileText size={22} color="var(--primary)" /> Monthly Bill &amp; ERP Ledger
         </h2>
         <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-          View delivery statement and download PDF invoice
+          Detailed customer ledger statement with opening &amp; closing balance and running tally
         </p>
       </div>
 
@@ -146,20 +230,20 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           />
         </div>
 
-        <button onClick={loadReport} className="btn btn-outline-primary" style={{ width: '100%' }} disabled={loading}>
+        <button onClick={loadReport} className="btn btn-outline-primary" style={{ width: '100%' }} disabled={loading || !selectedCustomerId}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 
       {/* Statement */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>Calculating statement...</div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>Calculating statement &amp; ledger...</div>
       ) : !reportData ? (
-        <div className="card empty-state">
-          <div className="empty-icon"><FileText size={32} /></div>
-          <h3>Select Customer &amp; Month</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            Choose a customer above to view their monthly statement.
+        <div className="card empty-state" style={{ padding: '48px 16px', textAlign: 'center' }}>
+          <div className="empty-icon"><FileText size={36} color="var(--primary)" /></div>
+          <h3 style={{ marginTop: 12, fontSize: '1.1rem' }}>No Customer Selected</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: 400, margin: '6px auto 0' }}>
+            Please select a customer from the dropdown above to view their comprehensive ERP account ledger and monthly statement.
           </p>
         </div>
       ) : (
@@ -168,14 +252,14 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: 14, marginBottom: 14 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
               <div>
-                <span className="badge badge-info" style={{ marginBottom: 6 }}>MONTHLY STATEMENT</span>
+                <span className="badge badge-info" style={{ marginBottom: 6 }}>ERP CUSTOMER LEDGER</span>
                 <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)', margin: '4px 0 2px' }}>{reportData.plant.name}</h2>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   {reportData.plant.address}{reportData.plant.phone ? ` • Ph: ${reportData.plant.phone}` : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Period</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Billing Period</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{reportData.month}</div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)' }}>
                   Generated: {new Date().toLocaleDateString('en-GB')}
@@ -209,11 +293,11 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
           {/* 4 Summary Cards — 2x2 grid always */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 18 }}>
             <div style={{ background: '#f1f5f9', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Prev. Balance</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Opening Balance</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 3 }}>Rs.{reportData.openingBalance.toLocaleString()}</div>
             </div>
             <div style={{ background: '#eff6ff', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>This Month ({reportData.monthBottlesDelivered} Bottles)</div>
+              <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>Month Deliveries ({reportData.monthBottlesDelivered} Bottles)</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d4ed8', marginTop: 3 }}>Rs.{reportData.monthBilling.toLocaleString()}</div>
             </div>
             <div style={{ background: '#ecfdf5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0' }}>
@@ -221,123 +305,111 @@ export default function MonthlyReportView({ initialCustomerId }: MonthlyReportVi
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#047857', marginTop: 3 }}>Rs.{reportData.monthPaymentsTotal.toLocaleString()}</div>
             </div>
             <div style={{ background: '#fef2f2', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fecaca' }}>
-              <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Balance Due</div>
+              <div style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>Closing Balance Due</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: 3 }}>Rs.{reportData.closingBalance.toLocaleString()}</div>
             </div>
           </div>
 
-          {/* Daily Deliveries */}
+          {/* Professional ERP Customer Account Ledger Table */}
           <div style={{ marginBottom: 18 }}>
-            <h4 style={{ fontSize: '0.9rem', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Calendar size={15} color="var(--primary)" /> Daily Deliveries
+            <h4 style={{ fontSize: '0.95rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <Calendar size={16} color="var(--primary)" /> Complete Ledger &amp; Running Balance
             </h4>
-            {reportData.monthDeliveries.length === 0 ? (
-              <div style={{ padding: '12px', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No deliveries recorded this month.
-              </div>
-            ) : (
-              <>
-                {/* Mobile rows */}
-                <div className="report-mobile-list">
-                  {reportData.monthDeliveries.map((d, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '0.84rem', gap: 8 }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{d.date}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {d.bottlesDelivered} delivered · @Rs.{d.rate}
-                        </div>
-                      </div>
-                      <div style={{ fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                        Rs.{d.totalAmount.toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#f8fafc', fontWeight: 800, fontSize: '0.85rem' }}>
-                    <span>TOTAL ({reportData.monthBottlesDelivered} Bottles)</span>
-                    <span>Rs.{reportData.monthBilling.toLocaleString()}</span>
+
+            {/* Mobile View */}
+            <div className="report-mobile-list">
+              {ledgerRows.map((r) => (
+                <div
+                  key={r.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderBottom: '1px solid #f1f5f9',
+                    background: r.type === 'opening' ? '#f8fafc' : r.type === 'payment' ? '#f0fdf4' : '#ffffff',
+                    fontSize: '0.84rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700 }}>{r.date}</span>
+                    <span style={{ fontWeight: 800, color: r.balance > 0 ? '#b91c1c' : 'var(--success)' }}>
+                      Bal: Rs.{r.balance.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {r.description}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, fontSize: '0.76rem', fontWeight: 600 }}>
+                    {r.bottles !== '-' && <span>Bottles: {r.bottles}</span>}
+                    {r.charges !== '-' && <span style={{ color: 'var(--primary)' }}>Charges: Rs.{Number(r.charges).toLocaleString()}</span>}
+                    {r.payment !== '-' && <span style={{ color: 'var(--success)' }}>Paid: Rs.{Number(r.payment).toLocaleString()}</span>}
                   </div>
                 </div>
-
-                {/* Desktop table */}
-                <div className="report-desktop-table" style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 10px' }}>Date</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Bottles Delivered</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Rate</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total (Rs.)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reportData.monthDeliveries.map((d, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px 10px', fontWeight: 600 }}>{d.date}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                            <span className="badge badge-info">{d.bottlesDelivered} Bottles</span>
-                          </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>Rs.{d.rate}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>Rs.{d.totalAmount.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                      <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
-                        <td style={{ padding: '10px' }}>TOTAL</td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>{reportData.monthBottlesDelivered} Bottles</td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>-</td>
-                        <td style={{ padding: '10px', textAlign: 'right' }}>Rs.{reportData.monthBilling.toLocaleString()}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Payments Received */}
-          {reportData.monthPayments.length > 0 && (
-            <div style={{ marginBottom: 18 }}>
-              <h4 style={{ fontSize: '0.9rem', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CheckCircle size={15} color="var(--success)" /> Payments Received
-              </h4>
-
-              <div className="report-mobile-list">
-                {reportData.monthPayments.map((p, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '0.84rem', gap: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{p.date}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {p.paymentMethod}{p.receiptNo ? ` · #${p.receiptNo}` : ''}
-                      </div>
-                    </div>
-                    <span style={{ fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>Rs.{p.amount.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="report-desktop-table" style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-                  <thead>
-                    <tr style={{ background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 10px' }}>Date</th>
-                      <th style={{ padding: '8px 10px' }}>Method</th>
-                      <th style={{ padding: '8px 10px' }}>Receipt #</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.monthPayments.map((p, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{p.date}</td>
-                        <td style={{ padding: '8px 10px' }}>{p.paymentMethod}</td>
-                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{p.receiptNo || '-'}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: 'var(--success)' }}>Rs.{p.amount.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', fontWeight: 800, fontSize: '0.9rem' }}>
+                <span>Closing Balance Due:</span>
+                <span style={{ color: '#b91c1c' }}>Rs. {reportData.closingBalance.toLocaleString()}</span>
               </div>
             </div>
-          )}
+
+            {/* Desktop Table View */}
+            <div className="report-desktop-table" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px' }}>Date</th>
+                    <th style={{ padding: '10px 12px' }}>Particulars / Description</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Bottles</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Charges / Deliveries (+)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Payment Received (-)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Running Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerRows.map((r) => (
+                    <tr
+                      key={r.id}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        background: r.type === 'opening' ? '#f8fafc' : r.type === 'payment' ? '#fafffa' : undefined,
+                      }}
+                    >
+                      <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{r.date}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: r.type === 'opening' ? 700 : 500 }}>
+                        {r.description}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        {r.bottles !== '-' ? <span className="badge badge-info">{r.bottles}</span> : '-'}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: r.charges !== '-' ? 'var(--primary)' : 'inherit' }}>
+                        {r.charges !== '-' ? `Rs. ${Number(r.charges).toLocaleString()}` : '-'}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: r.payment !== '-' ? 'var(--success)' : 'inherit' }}>
+                        {r.payment !== '-' ? `Rs. ${Number(r.payment).toLocaleString()}` : '-'}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: r.balance > 0 ? '#b91c1c' : 'var(--success)' }}>
+                        Rs. {r.balance.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
+                    <td style={{ padding: '12px' }} colSpan={2}>TOTALS / CLOSING BALANCE</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>{reportData.monthBottlesDelivered} Bottles</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: 'var(--primary)' }}>
+                      Rs. {reportData.monthBilling.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: 'var(--success)' }}>
+                      Rs. {reportData.monthPaymentsTotal.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: '#b91c1c', fontSize: '0.98rem' }}>
+                      Rs. {reportData.closingBalance.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Download Footer */}
           <div style={{ paddingTop: 14, borderTop: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 10 }}>
