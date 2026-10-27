@@ -21,6 +21,7 @@ export interface IDailyRevenue extends Document {
   expenses: IDailyExpense[];
   totalExpenses: number;
   netProfit: number;
+  profitShare20: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +52,7 @@ const DailyRevenueSchema = new Schema<IDailyRevenue>(
     expenses: [DailyExpenseSchema],
     totalExpenses: { type: Number, required: true, default: 0 },
     netProfit: { type: Number, required: true, default: 0 },
+    profitShare20: { type: Number, required: true, default: 0 },
     notes: { type: String, default: '', trim: true },
   },
   { timestamps: true }

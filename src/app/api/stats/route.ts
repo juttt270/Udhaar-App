@@ -158,6 +158,7 @@ export async function GET(req: NextRequest) {
         totalExpenses,
         wholesaleCost,
         netProfit,
+        profitShare20: Math.round(netProfit * 0.20),
         activeCustomersCount,
         totalPendingUdhaar,
         availableMonths,

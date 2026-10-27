@@ -37,10 +37,24 @@ export async function GET(req: NextRequest) {
       autoCash += Number(p.amount) || 0;
     }
 
-    // 3. Find if a record is already saved for this date
+    // 3. Auto-update any previous entries that don't have profitShare20 saved yet
+    const unmigrated = await DailyRevenue.find({
+      userId: userObjId,
+      $or: [{ profitShare20: { $exists: false } }, { profitShare20: null }],
+    });
+    if (unmigrated.length > 0) {
+      await Promise.all(
+        unmigrated.map((doc) => {
+          doc.profitShare20 = Math.round((Number(doc.netProfit) || 0) * 0.20);
+          return doc.save();
+        })
+      );
+    }
+
+    // 4. Find if a record is already saved for this date
     const saved = await DailyRevenue.findOne({ userId: userObjId, date }).lean();
 
-    // 4. Fetch all saved entries for the history ledger (sorted by date descending)
+    // 5. Fetch all saved entries for the history ledger (sorted by date descending)
     const history = await DailyRevenue.find({ userId: userObjId })
       .sort({ date: -1 })
       .lean();
@@ -119,6 +133,7 @@ export async function POST(req: NextRequest) {
     const totalExpenses = cleanExpenses.reduce((sum, e) => sum + e.amount, 0);
     // User requested formula: Total Amount billed minus wholesale bottle cost minus other expenses
     const netProfit = billed - wholesaleCost - totalExpenses;
+    const profitShare20 = Math.round(netProfit * 0.20);
 
     const record = await DailyRevenue.findOneAndUpdate(
       { userId: userObjId, date },
@@ -136,6 +151,7 @@ export async function POST(req: NextRequest) {
           expenses: cleanExpenses,
           totalExpenses,
           netProfit,
+          profitShare20,
           notes: String(notes || '').trim(),
         },
       },

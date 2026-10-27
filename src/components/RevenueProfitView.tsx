@@ -40,6 +40,7 @@ interface RevenueRecord {
   expenses: ExpenseItem[];
   totalExpenses: number;
   netProfit: number;
+  profitShare20?: number;
   notes?: string;
   createdAt: string;
 }
@@ -212,6 +213,7 @@ export default function RevenueProfitView() {
   const calcExpensesTotal = formExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   // Profit = Total Amount - Wholesale Bottle Cost - Expenses
   const calcNetProfit = calcTotalBilled - calcWholesale - calcExpensesTotal;
+  const calcProfitShare20 = Math.round(calcNetProfit * 0.2);
 
   // Handle Save
   const handleSaveEntry = async (e: React.FormEvent) => {
@@ -323,6 +325,7 @@ export default function RevenueProfitView() {
         wholesale: number;
         expenses: number;
         profit: number;
+        share20: number;
         daysCount: number;
       }
     >();
@@ -338,6 +341,7 @@ export default function RevenueProfitView() {
           wholesale: 0,
           expenses: 0,
           profit: 0,
+          share20: 0,
           daysCount: 0,
         });
       }
@@ -347,6 +351,7 @@ export default function RevenueProfitView() {
       item.wholesale += Number(h.wholesaleCost) || 0;
       item.expenses += Number(h.totalExpenses) || 0;
       item.profit += Number(h.netProfit) || 0;
+      item.share20 += h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round((Number(h.netProfit) || 0) * 0.2);
       item.daysCount += 1;
     });
 
@@ -361,6 +366,7 @@ export default function RevenueProfitView() {
     let wholesale = 0;
     let expenses = 0;
     let profit = 0;
+    let share20 = 0;
 
     displayedHistory.forEach((h) => {
       bottles += Number(h.bottlesSold) || 0;
@@ -369,9 +375,10 @@ export default function RevenueProfitView() {
       wholesale += Number(h.wholesaleCost) || 0;
       expenses += Number(h.totalExpenses) || 0;
       profit += Number(h.netProfit) || 0;
+      share20 += h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round((Number(h.netProfit) || 0) * 0.2);
     });
 
-    return { bottles, billed, cash, wholesale, expenses, profit };
+    return { bottles, billed, cash, wholesale, expenses, profit, share20 };
   }, [displayedHistory]);
 
   const getMonthDisplay = (mStr: string) => {
@@ -479,6 +486,9 @@ export default function RevenueProfitView() {
             style={{ color: summaryTotals.profit >= 0 ? '#059669' : '#dc2626' }}
           >
             {loading ? '...' : `Rs. ${summaryTotals.profit.toLocaleString()}`}
+          </div>
+          <div style={{ fontSize: '0.80rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+            20% Share: Rs. {summaryTotals.share20.toLocaleString()}
           </div>
           <div className="stat-hint">
             (Billed - Bottle Cost - Expenses)
@@ -603,6 +613,7 @@ export default function RevenueProfitView() {
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Wholesale Cost</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Expenses</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Profit</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
@@ -647,6 +658,20 @@ export default function RevenueProfitView() {
                               Margin: {margin}%
                             </span>
                           </div>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              fontSize: '0.86rem',
+                              fontWeight: 800,
+                              background: m.share20 >= 0 ? '#eff6ff' : '#fee2e2',
+                              color: m.share20 >= 0 ? '#0284c7' : '#dc2626',
+                            }}
+                          >
+                            Rs. {m.share20.toLocaleString()}
+                          </span>
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           <button
@@ -697,22 +722,36 @@ export default function RevenueProfitView() {
                       gap: 10,
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                       <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
                         {h.date}
                       </div>
-                      <span
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 14,
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
-                          color: h.netProfit >= 0 ? '#059669' : '#dc2626',
-                        }}
-                      >
-                        Profit: Rs. {h.netProfit.toLocaleString()}
-                      </span>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.80rem',
+                            fontWeight: 800,
+                            background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
+                            color: h.netProfit >= 0 ? '#059669' : '#dc2626',
+                          }}
+                        >
+                          Profit: Rs. {h.netProfit.toLocaleString()}
+                        </span>
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.80rem',
+                            fontWeight: 800,
+                            background: '#eff6ff',
+                            color: '#0284c7',
+                          }}
+                        >
+                          20%: Rs. {(h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
 
                     <div
@@ -828,6 +867,7 @@ export default function RevenueProfitView() {
                       <th style={{ padding: '12px 14px', textAlign: 'right' }}>Cash Received</th>
                       <th style={{ padding: '12px 14px' }}>Expenses Detail</th>
                       <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Profit</th>
                       <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
                     </tr>
                   </thead>
@@ -898,6 +938,20 @@ export default function RevenueProfitView() {
                             }}
                           >
                             Rs. {h.netProfit.toLocaleString()}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              background: (h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)) >= 0 ? '#eff6ff' : '#fee2e2',
+                              color: (h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)) >= 0 ? '#0284c7' : '#dc2626',
+                            }}
+                          >
+                            Rs. {(h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)).toLocaleString()}
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -1180,32 +1234,51 @@ export default function RevenueProfitView() {
                     borderRadius: 8,
                     marginTop: 14,
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 8,
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: 10,
                     fontSize: '0.84rem',
                     border: '1px solid var(--border-color)',
                   }}
                 >
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
-                    <strong style={{ color: '#d97706' }}>Rs. {calcWholesale.toLocaleString()}</strong>
+                    <strong style={{ color: '#d97706', display: 'block', fontSize: '1rem', marginTop: 2 }}>
+                      Rs. {calcWholesale.toLocaleString()}
+                    </strong>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                       ({calcTotalBottles} btl × Rs.{calcPlantCost})
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div>
                     <span style={{ color: 'var(--text-muted)' }}>Daily Net Profit: </span>
                     <strong
                       style={{
                         color: calcNetProfit >= 0 ? '#059669' : '#dc2626',
-                        fontSize: '1.1rem',
+                        fontSize: '1.05rem',
                         display: 'block',
+                        marginTop: 2,
                       }}
                     >
                       Rs. {calcNetProfit.toLocaleString()}
                     </strong>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      (Total Billed - Wholesale Cost - Expenses)
+                      (Billed - Wholesale - Exp)
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#0284c7', fontWeight: 700 }}>20% Profit Share: </span>
+                    <strong
+                      style={{
+                        color: calcProfitShare20 >= 0 ? '#0284c7' : '#dc2626',
+                        fontSize: '1.05rem',
+                        display: 'block',
+                        marginTop: 2,
+                      }}
+                    >
+                      Rs. {calcProfitShare20.toLocaleString()}
+                    </strong>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      (20% of Net Profit)
                     </div>
                   </div>
                 </div>

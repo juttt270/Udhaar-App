@@ -307,6 +307,9 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           >
             {loading ? '...' : `Rs. ${(stats?.netProfit || 0).toLocaleString()}`}
           </div>
+          <div style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+            20% Share: Rs. {Math.round((stats?.netProfit || 0) * 0.2).toLocaleString()}
+          </div>
           <div className="stat-hint">
             (Billed - Bottle cost - Expenses)
           </div>
