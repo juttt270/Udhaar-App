@@ -282,40 +282,8 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div className="stat-hint">Plant & delivery expenses</div>
         </div>
 
-        {/* 4. Net Profit */}
-        <div
-          className="stat-card"
-          style={{
-            borderLeft: `4px solid ${(stats?.netProfit || 0) >= 0 ? '#10b981' : '#ef4444'}`,
-          }}
-        >
-          <div className="stat-header">
-            <span>{selectedPeriod === 'today' ? "Today's Profit" : 'Month Net Profit'}</span>
-            <div
-              className="stat-icon"
-              style={{
-                background: (stats?.netProfit || 0) >= 0 ? '#ecfdf5' : '#fee2e2',
-                color: (stats?.netProfit || 0) >= 0 ? '#10b981' : '#ef4444',
-              }}
-            >
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div
-            className="stat-value"
-            style={{ color: (stats?.netProfit || 0) >= 0 ? '#059669' : '#dc2626' }}
-          >
-            {loading ? '...' : `Rs. ${(stats?.netProfit || 0).toLocaleString()}`}
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
-            20% Share: Rs. {Math.round((stats?.netProfit || 0) * 0.2).toLocaleString()}
-          </div>
-          <div className="stat-hint">
-            (Billed - Bottle cost - Expenses)
-          </div>
-        </div>
 
-        {/* 5. Cash Received / Collected */}
+        {/* 4. Cash Received / Collected */}
         <div className="stat-card" style={{ borderLeft: '4px solid #059669' }}>
           <div className="stat-header">
             <span>{selectedPeriod === 'today' ? 'Cash Received Today' : 'Cash Collected'}</span>
@@ -329,7 +297,7 @@ export default function DashboardView({ onNavigate, plantName }: DashboardViewPr
           <div className="stat-hint">Payments collected in period</div>
         </div>
 
-        {/* 6. Total Unpaid Balance (Overall) */}
+        {/* 5. Total Unpaid Balance (Overall) */}
         <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
           <div className="stat-header">
             <span>Total Pending Udhaar</span>

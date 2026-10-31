@@ -8,7 +8,6 @@ import {
   DollarSign,
   Plus,
   Trash2,
-  Calendar,
   X,
   CheckCircle2,
   Edit2,
@@ -16,6 +15,9 @@ import {
   Filter,
   BarChart3,
   Layers,
+  RefreshCw,
+  Coins,
+  Sparkles,
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -41,6 +43,7 @@ interface RevenueRecord {
   totalExpenses: number;
   netProfit: number;
   profitShare20?: number;
+  actualProfit?: number;
   notes?: string;
   createdAt: string;
 }
@@ -48,6 +51,7 @@ interface RevenueRecord {
 export default function RevenueProfitView() {
   const [history, setHistory] = useState<RevenueRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -57,7 +61,9 @@ export default function RevenueProfitView() {
 
   // Filters & Sorting
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'profit-desc' | 'profit-asc' | 'bottles-desc'>('date-desc');
+  const [sortBy, setSortBy] = useState<
+    'date-desc' | 'date-asc' | 'profit-desc' | 'profit-asc' | 'bottles-desc' | 'actual-desc'
+  >('date-desc');
 
   // Modal Form State
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
@@ -79,21 +85,30 @@ export default function RevenueProfitView() {
   const deletingRef = useRef(false);
   const toast = useToast();
 
-  // Load all history records
-  const loadHistory = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/revenue');
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load revenue data');
-      setHistory(json.history || []);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error';
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Load all history records (with optional notification on manual sync)
+  const loadHistory = useCallback(
+    async (showSyncToast = false) => {
+      if (showSyncToast) setSyncing(true);
+      else setLoading(true);
+
+      try {
+        const res = await fetch('/api/revenue');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to load revenue data');
+        setHistory(json.history || []);
+        if (showSyncToast) {
+          toast.success('All records recalculated & synchronized with deliveries & cash!');
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error';
+        toast.error(msg);
+      } finally {
+        setLoading(false);
+        setSyncing(false);
+      }
+    },
+    [toast]
+  );
 
   useEffect(() => {
     loadHistory();
@@ -112,43 +127,50 @@ export default function RevenueProfitView() {
         const s: RevenueRecord = json.saved;
         setFormPlantCost(s.plantCostPerBottle || 35);
 
-        const autoBtls =
-          s.autoBottles !== undefined
-            ? s.autoBottles
-            : json.auto?.bottles !== undefined
+        // Prioritize fresh auto bottles from deliveries
+        const currentAutoBtls =
+          json.auto?.bottles !== undefined
             ? json.auto.bottles
+            : s.autoBottles !== undefined
+            ? s.autoBottles
             : s.bottlesSold || 0;
+
+        const currentAutoBill =
+          json.auto?.billed !== undefined
+            ? json.auto.billed
+            : s.autoBilled !== undefined
+            ? s.autoBilled
+            : s.actualBilled || 0;
+
+        const currentCash =
+          json.auto?.cash !== undefined && json.auto.cash > 0
+            ? json.auto.cash
+            : s.cashReceived || 0;
+
         const extraBtls =
           s.extraBottles !== undefined
             ? s.extraBottles
-            : s.bottlesSold > autoBtls
-            ? s.bottlesSold - autoBtls
+            : s.bottlesSold > currentAutoBtls
+            ? s.bottlesSold - currentAutoBtls
             : '';
 
-        setFormAutoBottles(autoBtls);
-        setFormExtraBottles(extraBtls === 0 ? '' : extraBtls);
-
-        const autoBill =
-          s.autoBilled !== undefined
-            ? s.autoBilled
-            : json.auto?.billed !== undefined
-            ? json.auto.billed
-            : s.actualBilled || 0;
         const extraBill =
           s.extraBilled !== undefined
             ? s.extraBilled
-            : s.actualBilled > autoBill
-            ? s.actualBilled - autoBill
+            : s.actualBilled > currentAutoBill
+            ? s.actualBilled - currentAutoBill
             : '';
 
-        setFormAutoBilled(autoBill);
+        setFormAutoBottles(currentAutoBtls);
+        setFormExtraBottles(extraBtls === 0 ? '' : extraBtls);
+        setFormAutoBilled(currentAutoBill);
         setFormExtraBilled(extraBill === 0 ? '' : extraBill);
+        setFormCash(currentCash);
 
-        setFormCash(s.cashReceived || 0);
         setFormExpenses(
           s.expenses && s.expenses.length > 0
             ? s.expenses.map((e) => ({
-                id: e.id || `exp-${Date.now()}`,
+                id: e.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 title: e.title,
                 amount: e.amount === 0 ? '' : e.amount,
               }))
@@ -214,6 +236,8 @@ export default function RevenueProfitView() {
   // Profit = Total Amount - Wholesale Bottle Cost - Expenses
   const calcNetProfit = calcTotalBilled - calcWholesale - calcExpensesTotal;
   const calcProfitShare20 = Math.round(calcNetProfit * 0.2);
+  // Actual Profit: Remaining amount after deducting 20%
+  const calcActualProfit = calcNetProfit - calcProfitShare20;
 
   // Handle Save
   const handleSaveEntry = async (e: React.FormEvent) => {
@@ -303,10 +327,22 @@ export default function RevenueProfitView() {
     }
 
     list.sort((a, b) => {
+      const aProfit = Number(a.netProfit) || 0;
+      const bProfit = Number(b.netProfit) || 0;
+      const aAct =
+        a.actualProfit !== undefined
+          ? Number(a.actualProfit)
+          : aProfit - (a.profitShare20 ?? Math.round(aProfit * 0.2));
+      const bAct =
+        b.actualProfit !== undefined
+          ? Number(b.actualProfit)
+          : bProfit - (b.profitShare20 ?? Math.round(bProfit * 0.2));
+
       if (sortBy === 'date-desc') return b.date.localeCompare(a.date);
       if (sortBy === 'date-asc') return a.date.localeCompare(b.date);
-      if (sortBy === 'profit-desc') return (b.netProfit || 0) - (a.netProfit || 0);
-      if (sortBy === 'profit-asc') return (a.netProfit || 0) - (b.netProfit || 0);
+      if (sortBy === 'profit-desc') return bProfit - aProfit;
+      if (sortBy === 'profit-asc') return aProfit - bProfit;
+      if (sortBy === 'actual-desc') return bAct - aAct;
       if (sortBy === 'bottles-desc') return (b.bottlesSold || 0) - (a.bottlesSold || 0);
       return 0;
     });
@@ -326,6 +362,7 @@ export default function RevenueProfitView() {
         expenses: number;
         profit: number;
         share20: number;
+        actualProfit: number;
         daysCount: number;
       }
     >();
@@ -342,16 +379,22 @@ export default function RevenueProfitView() {
           expenses: 0,
           profit: 0,
           share20: 0,
+          actualProfit: 0,
           daysCount: 0,
         });
       }
       const item = map.get(mo)!;
+      const p = Number(h.netProfit) || 0;
+      const s20 = h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round(p * 0.2);
+      const act = h.actualProfit !== undefined ? Number(h.actualProfit) : p - s20;
+
       item.bottles += Number(h.bottlesSold) || 0;
       item.billed += Number(h.actualBilled) || 0;
       item.wholesale += Number(h.wholesaleCost) || 0;
       item.expenses += Number(h.totalExpenses) || 0;
-      item.profit += Number(h.netProfit) || 0;
-      item.share20 += h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round((Number(h.netProfit) || 0) * 0.2);
+      item.profit += p;
+      item.share20 += s20;
+      item.actualProfit += act;
       item.daysCount += 1;
     });
 
@@ -367,18 +410,24 @@ export default function RevenueProfitView() {
     let expenses = 0;
     let profit = 0;
     let share20 = 0;
+    let actualProfit = 0;
 
     displayedHistory.forEach((h) => {
+      const p = Number(h.netProfit) || 0;
+      const s20 = h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round(p * 0.2);
+      const act = h.actualProfit !== undefined ? Number(h.actualProfit) : p - s20;
+
       bottles += Number(h.bottlesSold) || 0;
       billed += Number(h.actualBilled) || 0;
       cash += Number(h.cashReceived) || 0;
       wholesale += Number(h.wholesaleCost) || 0;
       expenses += Number(h.totalExpenses) || 0;
-      profit += Number(h.netProfit) || 0;
-      share20 += h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round((Number(h.netProfit) || 0) * 0.2);
+      profit += p;
+      share20 += s20;
+      actualProfit += act;
     });
 
-    return { bottles, billed, cash, wholesale, expenses, profit, share20 };
+    return { bottles, billed, cash, wholesale, expenses, profit, share20, actualProfit };
   }, [displayedHistory]);
 
   const getMonthDisplay = (mStr: string) => {
@@ -405,21 +454,42 @@ export default function RevenueProfitView() {
             <TrendingUp size={24} color="var(--primary)" /> Revenue &amp; Profit Ledger
           </h2>
           <p className="desktop-only" style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Wholesale bottle cost, total billed revenue, plant expenses, and net profit
+            Wholesale bottle cost, billed revenue, plant expenses, total profit, and actual profit (after 20% cut)
           </p>
         </div>
 
-        <button
-          onClick={() => openEntryModal()}
-          className="btn btn-primary btn-lg"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)' }}
-        >
-          <Plus size={18} /> + Add / Edit Daily Entry
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => loadHistory(true)}
+            disabled={syncing || loading}
+            className="btn btn-secondary"
+            title="Recalculate & sync entries with deliveries and payments"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.86rem' }}
+          >
+            <RefreshCw size={16} className={syncing ? 'spin' : ''} />
+            <span>{syncing ? 'Syncing...' : 'Sync Deliveries'}</span>
+          </button>
+
+          <button
+            onClick={() => openEntryModal()}
+            className="btn btn-primary btn-lg"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)' }}
+          >
+            <Plus size={18} /> + Add / Edit Daily Entry
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards for Selected Month / Overall */}
-      <div className="stats-grid" style={{ marginBottom: 18 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
+        {/* 1. Total Bottles */}
         <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-header">
             <span>Total Bottles Supplied</span>
@@ -435,6 +505,7 @@ export default function RevenueProfitView() {
           </div>
         </div>
 
+        {/* 2. Total Billed */}
         <div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }}>
           <div className="stat-header">
             <span>Total Billed Revenue</span>
@@ -445,11 +516,12 @@ export default function RevenueProfitView() {
           <div className="stat-value" style={{ color: '#4f46e5' }}>
             {loading ? '...' : `Rs. ${summaryTotals.billed.toLocaleString()}`}
           </div>
-          <div className="stat-hint">
-            Cash Collected: Rs. {summaryTotals.cash.toLocaleString()}
+          <div className="stat-hint" style={{ color: 'var(--success)', fontWeight: 600 }}>
+            Cash Received: Rs. {summaryTotals.cash.toLocaleString()}
           </div>
         </div>
 
+        {/* 3. Total Expenses */}
         <div className="stat-card" style={{ borderLeft: '4px solid #dc2626' }}>
           <div className="stat-header">
             <span>Total Expenses</span>
@@ -463,19 +535,20 @@ export default function RevenueProfitView() {
           <div className="stat-hint">Plant &amp; running costs</div>
         </div>
 
+        {/* 4. Total Profit (Gross 100%) */}
         <div
           className="stat-card"
           style={{
-            borderLeft: `4px solid ${summaryTotals.profit >= 0 ? '#10b981' : '#ef4444'}`,
+            borderLeft: `4px solid ${summaryTotals.profit >= 0 ? '#0284c7' : '#ef4444'}`,
           }}
         >
           <div className="stat-header">
-            <span>Net Profit</span>
+            <span>Total Profit (100%)</span>
             <div
               className="stat-icon"
               style={{
-                background: summaryTotals.profit >= 0 ? '#ecfdf5' : '#fee2e2',
-                color: summaryTotals.profit >= 0 ? '#10b981' : '#ef4444',
+                background: summaryTotals.profit >= 0 ? '#eff6ff' : '#fee2e2',
+                color: summaryTotals.profit >= 0 ? '#0284c7' : '#ef4444',
               }}
             >
               <TrendingUp size={18} />
@@ -483,15 +556,43 @@ export default function RevenueProfitView() {
           </div>
           <div
             className="stat-value"
-            style={{ color: summaryTotals.profit >= 0 ? '#059669' : '#dc2626' }}
+            style={{ color: summaryTotals.profit >= 0 ? '#0284c7' : '#dc2626' }}
           >
             {loading ? '...' : `Rs. ${summaryTotals.profit.toLocaleString()}`}
           </div>
-          <div style={{ fontSize: '0.80rem', color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
-            20% Share: Rs. {summaryTotals.share20.toLocaleString()}
+          <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginTop: 2 }}>
+            20% Deduction: Rs. {summaryTotals.share20.toLocaleString()}
           </div>
-          <div className="stat-hint">
-            (Billed - Bottle Cost - Expenses)
+        </div>
+
+        {/* 5. Actual Profit (Remaining 80% After 20% Cut) */}
+        <div
+          className="stat-card"
+          style={{
+            borderLeft: `4px solid ${summaryTotals.actualProfit >= 0 ? '#10b981' : '#ef4444'}`,
+            background: 'linear-gradient(to bottom, #ffffff, #f0fdf4)',
+          }}
+        >
+          <div className="stat-header">
+            <span style={{ fontWeight: 700, color: '#047857' }}>Actual Profit (After 20%)</span>
+            <div
+              className="stat-icon"
+              style={{
+                background: summaryTotals.actualProfit >= 0 ? '#ecfdf5' : '#fee2e2',
+                color: summaryTotals.actualProfit >= 0 ? '#10b981' : '#ef4444',
+              }}
+            >
+              <Sparkles size={18} />
+            </div>
+          </div>
+          <div
+            className="stat-value"
+            style={{ color: summaryTotals.actualProfit >= 0 ? '#059669' : '#dc2626', fontWeight: 800 }}
+          >
+            {loading ? '...' : `Rs. ${summaryTotals.actualProfit.toLocaleString()}`}
+          </div>
+          <div className="stat-hint" style={{ color: '#047857', fontWeight: 600 }}>
+            Remaining after 20% cut
           </div>
         </div>
       </div>
@@ -509,7 +610,14 @@ export default function RevenueProfitView() {
         }}
       >
         {/* Tab switch between Daily Ledger and Monthly Record */}
-        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+        <div
+          style={{
+            display: 'flex',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+          }}
+        >
           <button
             onClick={() => setViewMode('daily')}
             style={{
@@ -578,9 +686,10 @@ export default function RevenueProfitView() {
               >
                 <option value="date-desc">Date (Newest First)</option>
                 <option value="date-asc">Date (Oldest First)</option>
-                <option value="profit-desc">Profit (Highest First)</option>
-                <option value="profit-asc">Profit (Lowest First)</option>
-                <option value="bottles-desc">Bottles (Highest First)</option>
+                <option value="actual-desc">Actual Profit (Highest)</option>
+                <option value="profit-desc">Total Profit (Highest)</option>
+                <option value="profit-asc">Total Profit (Lowest)</option>
+                <option value="bottles-desc">Bottles (Highest)</option>
               </select>
             </div>
           </div>
@@ -612,8 +721,9 @@ export default function RevenueProfitView() {
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Billed (Revenue)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Wholesale Cost</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Expenses</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Profit</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Profit</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Deduction</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actual Profit (After 20%)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
@@ -648,8 +758,8 @@ export default function RevenueProfitView() {
                                 borderRadius: 12,
                                 fontSize: '0.86rem',
                                 fontWeight: 800,
-                                background: m.profit >= 0 ? '#ecfdf5' : '#fee2e2',
-                                color: m.profit >= 0 ? '#059669' : '#dc2626',
+                                background: m.profit >= 0 ? '#eff6ff' : '#fee2e2',
+                                color: m.profit >= 0 ? '#0284c7' : '#dc2626',
                               }}
                             >
                               Rs. {m.profit.toLocaleString()}
@@ -665,12 +775,26 @@ export default function RevenueProfitView() {
                               padding: '4px 10px',
                               borderRadius: 12,
                               fontSize: '0.86rem',
-                              fontWeight: 800,
-                              background: m.share20 >= 0 ? '#eff6ff' : '#fee2e2',
-                              color: m.share20 >= 0 ? '#0284c7' : '#dc2626',
+                              fontWeight: 700,
+                              background: '#f1f5f9',
+                              color: '#64748b',
                             }}
                           >
                             Rs. {m.share20.toLocaleString()}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 12,
+                              fontSize: '0.88rem',
+                              fontWeight: 800,
+                              background: m.actualProfit >= 0 ? '#ecfdf5' : '#fee2e2',
+                              color: m.actualProfit >= 0 ? '#059669' : '#dc2626',
+                            }}
+                          >
+                            Rs. {m.actualProfit.toLocaleString()}
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -711,148 +835,201 @@ export default function RevenueProfitView() {
             <>
               {/* Mobile Cards View */}
               <div className="payment-mobile-list">
-                {displayedHistory.map((h) => (
-                  <div
-                    key={h._id}
-                    style={{
-                      padding: '14px',
-                      borderBottom: '1px solid #f1f5f9',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
-                        {h.date}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: 12,
-                            fontSize: '0.80rem',
-                            fontWeight: 800,
-                            background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
-                            color: h.netProfit >= 0 ? '#059669' : '#dc2626',
-                          }}
-                        >
-                          Profit: Rs. {h.netProfit.toLocaleString()}
-                        </span>
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: 12,
-                            fontSize: '0.80rem',
-                            fontWeight: 800,
-                            background: '#eff6ff',
-                            color: '#0284c7',
-                          }}
-                        >
-                          20%: Rs. {(h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+                {displayedHistory.map((h) => {
+                  const p = Number(h.netProfit) || 0;
+                  const s20 = h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round(p * 0.2);
+                  const act = h.actualProfit !== undefined ? Number(h.actualProfit) : p - s20;
 
+                  return (
                     <div
+                      key={h._id}
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 8,
-                        background: '#f8fafc',
-                        padding: 10,
-                        borderRadius: 8,
-                        fontSize: '0.82rem',
+                        padding: '14px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
                       }}
                     >
-                      <div>
-                        <span style={{ color: 'var(--text-muted)' }}>Total Bottles: </span>
-                        <strong style={{ color: 'var(--primary)', fontSize: '0.92rem' }}>
-                          {h.bottlesSold}
-                          {h.extraBottles ? (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {' '}
-                              ({h.autoBottles || 0} + {h.extraBottles})
-                            </span>
-                          ) : null}
-                        </strong>
-                      </div>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
-                        <strong style={{ color: '#d97706' }}>Rs. {h.wholesaleCost.toLocaleString()}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)' }}>Actual Billed: </span>
-                        <strong>
-                          Rs. {h.actualBilled.toLocaleString()}
-                          {h.extraBilled ? (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {' '}
-                              (+{h.extraBilled})
-                            </span>
-                          ) : null}
-                        </strong>
-                      </div>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)' }}>Cash In: </span>
-                        <strong style={{ color: 'var(--success)' }}>Rs. {h.cashReceived.toLocaleString()}</strong>
-                      </div>
-                    </div>
-
-                    {/* Expenses chips */}
-                    {h.expenses && h.expenses.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Expenses:</span>
-                        {h.expenses.map((e, idx) => (
+                      {/* Date & Profit Badges */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>
+                          {h.date}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           <span
-                            key={idx}
                             style={{
-                              fontSize: '0.74rem',
-                              background: '#fee2e2',
-                              color: '#dc2626',
-                              padding: '2px 7px',
-                              borderRadius: 4,
-                              fontWeight: 600,
+                              padding: '3px 8px',
+                              borderRadius: 12,
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              background: '#eff6ff',
+                              color: '#0284c7',
                             }}
                           >
-                            {e.title}: Rs.{e.amount}
+                            Profit: Rs. {p.toLocaleString()}
                           </span>
-                        ))}
-                        <strong style={{ fontSize: '0.75rem', color: '#dc2626' }}>
-                          (Total: Rs. {h.totalExpenses.toLocaleString()})
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 12,
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                            }}
+                          >
+                            20%: Rs. {s20.toLocaleString()}
+                          </span>
+                          <span
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: 12,
+                              fontSize: '0.80rem',
+                              fontWeight: 800,
+                              background: act >= 0 ? '#ecfdf5' : '#fee2e2',
+                              color: act >= 0 ? '#059669' : '#dc2626',
+                            }}
+                          >
+                            Actual: Rs. {act.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Figures 2x2 Grid */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 8,
+                          background: '#f8fafc',
+                          padding: 10,
+                          borderRadius: 8,
+                          fontSize: '0.82rem',
+                        }}
+                      >
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Bottles Sold: </span>
+                          <strong style={{ color: 'var(--primary)', fontSize: '0.92rem' }}>
+                            {h.bottlesSold}
+                            {h.extraBottles ? (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {' '}
+                                ({h.autoBottles || 0} + {h.extraBottles})
+                              </span>
+                            ) : null}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
+                          <strong style={{ color: '#d97706' }}>Rs. {h.wholesaleCost.toLocaleString()}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Actual Billed: </span>
+                          <strong>
+                            Rs. {h.actualBilled.toLocaleString()}
+                            {h.extraBilled ? (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {' '}
+                                (+{h.extraBilled})
+                              </span>
+                            ) : null}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Cash Received: </span>
+                          <strong style={{ color: 'var(--success)', fontWeight: 800 }}>
+                            Rs. {Number(h.cashReceived || 0).toLocaleString()}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Actual Profit Highlight Banner */}
+                      <div
+                        style={{
+                          background: act >= 0 ? '#f0fdf4' : '#fef2f2',
+                          border: `1px solid ${act >= 0 ? '#bbf7d0' : '#fecaca'}`,
+                          borderRadius: 6,
+                          padding: '8px 10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 4,
+                          fontSize: '0.82rem',
+                        }}
+                      >
+                        <span style={{ color: act >= 0 ? '#166534' : '#991b1b', fontWeight: 600 }}>
+                          Actual Profit (After 20%):
+                        </span>
+                        <strong style={{ color: act >= 0 ? '#15803d' : '#b91c1c', fontSize: '0.95rem' }}>
+                          Rs. {act.toLocaleString()}
                         </strong>
                       </div>
-                    ) : (
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        No expenses on this date
-                      </div>
-                    )}
 
-                    {h.notes && (
-                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        &ldquo;{h.notes}&rdquo;
-                      </div>
-                    )}
+                      {/* Expenses chips */}
+                      {h.expenses && h.expenses.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Expenses:</span>
+                          {h.expenses.map((e, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                fontSize: '0.74rem',
+                                background: '#fee2e2',
+                                color: '#dc2626',
+                                padding: '2px 7px',
+                                borderRadius: 4,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {e.title}: Rs.{e.amount}
+                            </span>
+                          ))}
+                          <strong style={{ fontSize: '0.75rem', color: '#dc2626' }}>
+                            (Total: Rs. {h.totalExpenses.toLocaleString()})
+                          </strong>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          No expenses on this date
+                        </div>
+                      )}
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                      <button
-                        onClick={() => openEntryModal(h.date)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <Edit2 size={13} /> Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(h._id)}
-                        disabled={deletingId === h._id}
-                        className="toast-close"
-                        title="Delete entry"
-                      >
-                        <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
-                      </button>
+                      {h.notes && (
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          &ldquo;{h.notes}&rdquo;
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        <button
+                          onClick={() => openEntryModal(h.date)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Edit2 size={13} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(h._id)}
+                          disabled={deletingId === h._id}
+                          className="toast-close"
+                          title="Delete entry"
+                        >
+                          <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Desktop Table View */}
@@ -866,115 +1043,136 @@ export default function RevenueProfitView() {
                       <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Billed (Revenue)</th>
                       <th style={{ padding: '12px 14px', textAlign: 'right' }}>Cash Received</th>
                       <th style={{ padding: '12px 14px' }}>Expenses Detail</th>
-                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Net Profit</th>
-                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Profit</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Total Profit</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>20% Deduction</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actual Profit (After 20%)</th>
                       <th style={{ padding: '12px 14px', textAlign: 'center' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedHistory.map((h) => (
-                      <tr key={h._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 800 }}>{h.date}</td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
-                          {h.bottlesSold}
-                          {h.extraBottles ? (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              Auto: {h.autoBottles || 0} + Extra: {h.extraBottles}
-                            </div>
-                          ) : null}
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
-                          Rs. {h.wholesaleCost.toLocaleString()}
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@ Rs.{h.plantCostPerBottle}/btl</div>
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
-                          Rs. {h.actualBilled.toLocaleString()}
-                          {h.extraBilled ? (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              Auto: Rs.{h.autoBilled || 0} + Extra: Rs.{h.extraBilled}
-                            </div>
-                          ) : null}
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 800 }}>
-                          Rs. {h.cashReceived.toLocaleString()}
-                        </td>
-                        <td style={{ padding: '12px 14px', maxWidth: 220 }}>
-                          {h.expenses && h.expenses.length > 0 ? (
-                            <div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {h.expenses.map((e, idx) => (
-                                  <span
-                                    key={idx}
-                                    style={{
-                                      fontSize: '0.72rem',
-                                      background: '#fee2e2',
-                                      color: '#dc2626',
-                                      padding: '1px 6px',
-                                      borderRadius: 4,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    {e.title}: {e.amount}
-                                  </span>
-                                ))}
+                    {displayedHistory.map((h) => {
+                      const p = Number(h.netProfit) || 0;
+                      const s20 = h.profitShare20 !== undefined ? Number(h.profitShare20) : Math.round(p * 0.2);
+                      const act = h.actualProfit !== undefined ? Number(h.actualProfit) : p - s20;
+
+                      return (
+                        <tr key={h._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 800 }}>{h.date}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                            {h.bottlesSold}
+                            {h.extraBottles ? (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                Auto: {h.autoBottles || 0} + Extra: {h.extraBottles}
                               </div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', marginTop: 3 }}>
-                                Total: Rs. {h.totalExpenses.toLocaleString()}
+                            ) : null}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
+                            Rs. {h.wholesaleCost.toLocaleString()}
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@ Rs.{h.plantCostPerBottle}/btl</div>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                            Rs. {h.actualBilled.toLocaleString()}
+                            {h.extraBilled ? (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                Auto: Rs.{h.autoBilled || 0} + Extra: Rs.{h.extraBilled}
                               </div>
+                            ) : null}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 800 }}>
+                            Rs. {Number(h.cashReceived || 0).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '12px 14px', maxWidth: 220 }}>
+                            {h.expenses && h.expenses.length > 0 ? (
+                              <div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                  {h.expenses.map((e, idx) => (
+                                    <span
+                                      key={idx}
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        background: '#fee2e2',
+                                        color: '#dc2626',
+                                        padding: '1px 6px',
+                                        borderRadius: 4,
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {e.title}: {e.amount}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', marginTop: 3 }}>
+                                  Total: Rs. {h.totalExpenses.toLocaleString()}
+                                </div>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 12,
+                                fontSize: '0.85rem',
+                                fontWeight: 800,
+                                background: p >= 0 ? '#eff6ff' : '#fee2e2',
+                                color: p >= 0 ? '#0284c7' : '#dc2626',
+                              }}
+                            >
+                              Rs. {p.toLocaleString()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 12,
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                background: '#f1f5f9',
+                                color: '#64748b',
+                              }}
+                            >
+                              Rs. {s20.toLocaleString()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 12,
+                                fontSize: '0.86rem',
+                                fontWeight: 800,
+                                background: act >= 0 ? '#ecfdf5' : '#fee2e2',
+                                color: act >= 0 ? '#059669' : '#dc2626',
+                              }}
+                            >
+                              Rs. {act.toLocaleString()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                              <button
+                                onClick={() => openEntryModal(h.date)}
+                                className="btn btn-secondary btn-sm"
+                                title="Edit entry"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(h._id)}
+                                disabled={deletingId === h._id}
+                                className="toast-close"
+                                title="Delete entry"
+                              >
+                                <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
+                              </button>
                             </div>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <span
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: 12,
-                              fontSize: '0.85rem',
-                              fontWeight: 800,
-                              background: h.netProfit >= 0 ? '#ecfdf5' : '#fee2e2',
-                              color: h.netProfit >= 0 ? '#059669' : '#dc2626',
-                            }}
-                          >
-                            Rs. {h.netProfit.toLocaleString()}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <span
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: 12,
-                              fontSize: '0.85rem',
-                              fontWeight: 800,
-                              background: (h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)) >= 0 ? '#eff6ff' : '#fee2e2',
-                              color: (h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)) >= 0 ? '#0284c7' : '#dc2626',
-                            }}
-                          >
-                            Rs. {(h.profitShare20 ?? Math.round((h.netProfit || 0) * 0.2)).toLocaleString()}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                            <button
-                              onClick={() => openEntryModal(h.date)}
-                              className="btn btn-secondary btn-sm"
-                              title="Edit entry"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(h._id)}
-                              disabled={deletingId === h._id}
-                              className="toast-close"
-                              title="Delete entry"
-                            >
-                              <Trash2 size={15} color={deletingId === h._id ? 'var(--text-muted)' : 'var(--danger)'} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1034,7 +1232,7 @@ export default function RevenueProfitView() {
 
                 {loadingDateData && (
                   <div style={{ fontSize: '0.78rem', color: 'var(--primary)', marginBottom: 10 }}>
-                    Fetching delivery &amp; payment records for {formDate}...
+                    Fetching up-to-date delivery &amp; payment records for {formDate}...
                   </div>
                 )}
 
@@ -1170,6 +1368,34 @@ export default function RevenueProfitView() {
                   </div>
                 </div>
 
+                {/* 3. Cash Received Today (Auto fetched from customer payments) */}
+                <div
+                  style={{
+                    background: '#f0fdf4',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #bbf7d0',
+                    marginBottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Coins size={18} color="var(--success)" />
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#166534' }}>
+                        Cash Received on Date: Rs. {Number(formCash || 0).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#15803d' }}>
+                        Auto-synchronized from payments (for record; does not change profit formula)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Dynamic Multi-Row Expenses */}
                 <div style={{ marginTop: 12, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1226,7 +1452,7 @@ export default function RevenueProfitView() {
                   )}
                 </div>
 
-                {/* Live Net Profit Box (Profit = Total Amount - Wholesale Cost - Expenses) */}
+                {/* Live Profit Box: Total Profit (100%), 20% Deduction, and Actual Profit (After 20%) */}
                 <div
                   style={{
                     background: '#f8fafc',
@@ -1234,7 +1460,7 @@ export default function RevenueProfitView() {
                     borderRadius: 8,
                     marginTop: 14,
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
                     gap: 10,
                     fontSize: '0.84rem',
                     border: '1px solid var(--border-color)',
@@ -1242,43 +1468,69 @@ export default function RevenueProfitView() {
                 >
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Wholesale Cost: </span>
-                    <strong style={{ color: '#d97706', display: 'block', fontSize: '1rem', marginTop: 2 }}>
+                    <strong style={{ color: '#d97706', display: 'block', fontSize: '0.96rem', marginTop: 2 }}>
                       Rs. {calcWholesale.toLocaleString()}
                     </strong>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
                       ({calcTotalBottles} btl × Rs.{calcPlantCost})
                     </div>
                   </div>
+
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Daily Net Profit: </span>
+                    <span style={{ color: 'var(--text-muted)' }}>Total Profit (100%): </span>
                     <strong
                       style={{
-                        color: calcNetProfit >= 0 ? '#059669' : '#dc2626',
-                        fontSize: '1.05rem',
+                        color: calcNetProfit >= 0 ? '#0284c7' : '#dc2626',
+                        fontSize: '1rem',
                         display: 'block',
                         marginTop: 2,
                       }}
                     >
                       Rs. {calcNetProfit.toLocaleString()}
                     </strong>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
                       (Billed - Wholesale - Exp)
                     </div>
                   </div>
+
                   <div>
-                    <span style={{ color: '#0284c7', fontWeight: 700 }}>20% Profit Share: </span>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>20% Deduction: </span>
                     <strong
                       style={{
-                        color: calcProfitShare20 >= 0 ? '#0284c7' : '#dc2626',
-                        fontSize: '1.05rem',
+                        color: '#64748b',
+                        fontSize: '1rem',
                         display: 'block',
                         marginTop: 2,
                       }}
                     >
                       Rs. {calcProfitShare20.toLocaleString()}
                     </strong>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      (20% of Net Profit)
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
+                      (20% of Total Profit)
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ecfdf5',
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #a7f3d0',
+                    }}
+                  >
+                    <span style={{ color: '#047857', fontWeight: 800 }}>Actual Profit: </span>
+                    <strong
+                      style={{
+                        color: calcActualProfit >= 0 ? '#059669' : '#dc2626',
+                        fontSize: '1.1rem',
+                        display: 'block',
+                        marginTop: 2,
+                      }}
+                    >
+                      Rs. {calcActualProfit.toLocaleString()}
+                    </strong>
+                    <div style={{ fontSize: '0.70rem', color: '#047857', fontWeight: 600 }}>
+                      (After 20% Deduction)
                     </div>
                   </div>
                 </div>
@@ -1291,7 +1543,7 @@ export default function RevenueProfitView() {
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
                     className="form-input"
-                    placeholder="e.g. Delivered 20 bottles by rider, paid petrol"
+                    placeholder="e.g. Delivered bottles by rider, paid petrol"
                   />
                 </div>
               </div>

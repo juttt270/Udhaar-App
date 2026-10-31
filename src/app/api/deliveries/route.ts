@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { Delivery } from '@/models/Delivery';
 import { Payment } from '@/models/Payment';
 import { authenticateRequest } from '@/lib/auth';
+import { syncDailyRevenueForDate } from '@/lib/revenueSync';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,6 +131,9 @@ export async function POST(req: NextRequest) {
     if (paymentsToCreate.length > 0) {
       await Payment.insertMany(paymentsToCreate);
     }
+
+    // Auto-sync DailyRevenue if an entry exists for this date
+    await syncDailyRevenueForDate(userObjectId, date);
 
     // Return updated totals for the date
     const updatedDeliveries = await Delivery.find({

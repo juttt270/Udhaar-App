@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { Payment } from '@/models/Payment';
 import { Customer } from '@/models/Customer';
 import { authenticateRequest } from '@/lib/auth';
+import { syncDailyRevenueForDate } from '@/lib/revenueSync';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,9 @@ export async function POST(req: NextRequest) {
       notes: notes?.trim() || '',
     });
 
+    // Auto-sync DailyRevenue if an entry exists for this date
+    await syncDailyRevenueForDate(session.userId, paymentDate);
+
     return NextResponse.json({
       success: true,
       message: `Payment of Rs. ${amount} received successfully for ${customer.name}!`,
@@ -110,10 +114,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Payment ID is required.' }, { status: 400 });
     }
 
-    await Payment.findOneAndDelete({
+    const deletedPayment = await Payment.findOneAndDelete({
       _id: id,
       userId: session.userId,
     });
+
+    if (deletedPayment?.date) {
+      await syncDailyRevenueForDate(session.userId, deletedPayment.date);
+    }
 
     return NextResponse.json({
       success: true,
